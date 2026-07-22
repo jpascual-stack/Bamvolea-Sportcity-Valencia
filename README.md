@@ -56,14 +56,22 @@ Configura los **secrets** de cada función (Edge Functions > Settings):
 `SUPABASE_URL` y `SUPABASE_ANON_KEY` ya están disponibles automáticamente
 dentro de las Edge Functions, no hace falta configurarlos.
 
-**Importante sobre Playtomic**: las URLs y nombres de campo usados en
-`playtomic-proxy/index.ts` (`https://playtomic.io/api/...`, `resource_id`,
-`instructor_name`, etc.) son una referencia de partida, no están
-verificados contra la documentación oficial vigente de vuestra cuenta.
-Antes de dar por buena la integración, comprobad con una llamada real
-(Postman o similar) el endpoint exacto, el formato de autenticación y los
-nombres de campo de vuestra cuenta de Playtomic, y ajustad la función en
-consecuencia. Nunca pongáis `PLAYTOMIC_CLIENT_ID`/`SECRET` en el frontend.
+**Importante sobre Playtomic**: `playtomic-proxy/index.ts` usa la
+["Third Party API" pública de Playtomic para clubs](https://third-party.playtomic.io/)
+(`https://thirdparty.playtomic.io/api/v1/oauth/token` para login,
+`.../api/v1/bookings` para reservas — nótese que el host de la API no lleva
+guion, a diferencia del sitio de documentación). Las credenciales se
+generan en Playtomic Manager → Settings → Developer tools. Aun así,
+comprobad con una llamada real (Postman o el propio Playtomic Manager)
+antes de confiar del todo en los datos, porque:
+- El campo `coach_ids` de cada reserva son IDs de Playtomic, no nombres —
+  si vuestra cuenta no expone el nombre del profesor en ese mismo payload,
+  el casado por nombre (`trainers.external_system_name`) en KPIs y
+  Playtomic Manager no encontrará coincidencias hasta resolver esos IDs
+  contra el endpoint de profesores/empleados de Playtomic (no implementado
+  aquí).
+- La API solo conserva reservas de los últimos ~3 meses.
+Nunca pongáis `PLAYTOMIC_CLIENT_ID`/`SECRET` en el frontend.
 
 ## 3. Configurar el frontend
 

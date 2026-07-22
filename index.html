@@ -1,0 +1,1850 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>CRM Bamvolea Sportcity Valencia</title>
+<script>
+  // Rellena esto con los datos de tu propio proyecto Supabase (ver README).
+  // window.SUPABASE_ANON_KEY es pública por diseño: la seguridad real vive
+  // en las políticas de RLS de cada tabla, no en ocultar esta clave.
+  window.SUPABASE_URL = 'https://TU-PROYECTO.supabase.co';
+  window.SUPABASE_ANON_KEY = 'TU-ANON-KEY';
+  window.EVENTOS_PROVEEDOR_EMAIL = ''; // opcional: email del proveedor de catering/extras
+</script>
+<style>
+  :root {
+    --court: #2f6f4f;
+    --court-dark: #1d4a34;
+    --court-light: #e6f2ec;
+    --accent: #d98c3a;
+    --bg: #f5f7f6;
+    --card: #ffffff;
+    --border: #dfe6e2;
+    --text: #1d2624;
+    --text-muted: #66756f;
+    --danger: #b3413a;
+    --warning: #c98a1d;
+    --ok: #2f6f4f;
+    --radius: 10px;
+    --shadow: 0 1px 2px rgba(0,0,0,.06), 0 2px 8px rgba(0,0,0,.04);
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: var(--bg); color: var(--text); }
+  a { color: var(--court-dark); }
+  button { cursor: pointer; font-family: inherit; }
+  .btn { background: var(--court); color: #fff; border: none; padding: 8px 14px; border-radius: var(--radius); font-size: 14px; font-weight: 600; }
+  .btn:hover { background: var(--court-dark); }
+  .btn.secondary { background: #fff; color: var(--court-dark); border: 1px solid var(--border); }
+  .btn.danger { background: var(--danger); }
+  .btn.small { padding: 4px 10px; font-size: 12px; }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+  input, select, textarea { font-family: inherit; font-size: 14px; padding: 7px 10px; border: 1px solid var(--border); border-radius: 8px; background: #fff; color: var(--text); width: 100%; }
+  label { font-size: 12px; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 3px; }
+  .field { margin-bottom: 10px; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 16px; }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; }
+  .row > * { flex: 1; min-width: 160px; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  th { color: var(--text-muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .03em; }
+  .pill { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+  .pill.activo { background: #e3f3e9; color: var(--ok); }
+  .pill.espera { background: #fdf1de; color: var(--warning); }
+  .pill.baja { background: #f6e4e2; color: var(--danger); }
+  .pill.pagado { background: #e3f3e9; color: var(--ok); }
+  .pill.pendiente { background: #fdf1de; color: var(--warning); }
+  .tip { background: var(--court-light); border-left: 4px solid var(--court); padding: 10px 14px; border-radius: 6px; font-size: 13px; margin: 10px 0; }
+  .warn { background: #fdf1de; border-left: 4px solid var(--warning); padding: 10px 14px; border-radius: 6px; font-size: 13px; margin: 10px 0; }
+  .hidden { display: none !important; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  h2 { font-size: 16px; margin: 0 0 10px; }
+  h3 { font-size: 14px; margin: 0 0 8px; }
+  .muted { color: var(--text-muted); font-size: 12px; }
+
+  #login-screen, #trainer-pin-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: linear-gradient(160deg, var(--court-dark), var(--court)); }
+  .auth-box { background: #fff; border-radius: 14px; padding: 32px; width: 340px; box-shadow: var(--shadow); }
+  .auth-box h1 { color: var(--court-dark); font-size: 22px; }
+  .auth-switch { margin-top: 14px; text-align: center; font-size: 13px; }
+
+  #app { display: none; min-height: 100vh; }
+  #app.active { display: flex; }
+  #sidebar { width: 230px; background: var(--court-dark); color: #fff; flex-shrink: 0; display: flex; flex-direction: column; }
+  #sidebar .brand { padding: 18px 16px; font-weight: 700; font-size: 15px; border-bottom: 1px solid rgba(255,255,255,.15); }
+  #sidebar .club-select { padding: 10px 14px; }
+  #sidebar .club-select select { background: rgba(255,255,255,.1); color: #fff; border: 1px solid rgba(255,255,255,.25); }
+  #nav-blocks { flex: 1; overflow-y: auto; padding: 6px 0; }
+  .nav-block > .nav-block-title { padding: 10px 16px; font-size: 13px; font-weight: 700; cursor: pointer; opacity: .9; display: flex; justify-content: space-between; }
+  .nav-block .nav-sub { display: none; }
+  .nav-block.open .nav-sub { display: block; }
+  .nav-sub a { display: block; padding: 7px 16px 7px 26px; font-size: 13px; color: rgba(255,255,255,.8); text-decoration: none; }
+  .nav-sub a:hover, .nav-sub a.active { background: rgba(255,255,255,.12); color: #fff; }
+  #sidebar .user-box { padding: 12px 16px; border-top: 1px solid rgba(255,255,255,.15); font-size: 12px; }
+  #sidebar .user-box button { margin-top: 6px; }
+
+  #content { flex: 1; padding: 22px 26px; overflow-y: auto; max-height: 100vh; }
+  .content-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px; }
+
+  .kpi-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+  .kpi-card { flex: 1; min-width: 130px; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; box-shadow: var(--shadow); }
+  .kpi-card .num { font-size: 22px; font-weight: 700; color: var(--court-dark); }
+  .kpi-card .label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .03em; }
+
+  .grid-parrilla { display: grid; grid-template-columns: 70px repeat(7, 1fr); gap: 4px; font-size: 12px; }
+  .grid-parrilla .head { font-weight: 700; text-align: center; padding: 6px; }
+  .grid-parrilla .hourcell { padding: 6px 4px; color: var(--text-muted); text-align: right; }
+  .slot { background: #fff; border: 1px solid var(--border); border-radius: 6px; padding: 4px 6px; min-height: 44px; }
+  .slot.empty { background: #fafbfa; border-style: dashed; color: var(--text-muted); display: flex; align-items: center; justify-content: center; cursor: pointer; }
+  .slot .cls { border-radius: 4px; padding: 3px 5px; margin-bottom: 3px; font-size: 11px; color: #fff; cursor: pointer; }
+  .slot .cls.warn-slot { outline: 2px solid var(--warning); }
+
+  .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.4); display: flex; align-items: flex-start; justify-content: center; padding: 40px 20px; overflow-y: auto; z-index: 50; }
+  .modal { background: #fff; border-radius: var(--radius); padding: 20px; width: 480px; max-width: 100%; }
+  .modal .close-x { float: right; background: none; border: none; font-size: 18px; color: var(--text-muted); }
+
+  #toast-box { position: fixed; bottom: 18px; right: 18px; z-index: 100; display: flex; flex-direction: column; gap: 8px; max-width: 320px; }
+  .toast { background: var(--court-dark); color: #fff; padding: 10px 14px; border-radius: 8px; font-size: 13px; box-shadow: var(--shadow); }
+  .toast.error { background: var(--danger); }
+
+  #notif-panel { position: fixed; bottom: 18px; right: 18px; width: 300px; background: #fff; border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); z-index: 90; }
+  #notif-panel .notif-head { padding: 10px 14px; font-weight: 700; font-size: 13px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; }
+  #notif-panel .notif-body { max-height: 240px; overflow-y: auto; padding: 8px 14px; font-size: 13px; }
+
+  /* Vista entrenador: pensada para móvil, texto grande, poco scroll */
+  #trainer-view { display: none; min-height: 100vh; background: var(--bg); }
+  #trainer-view.active { display: block; }
+  #trainer-view .tv-header { background: var(--court-dark); color: #fff; padding: 16px 18px; display: flex; justify-content: space-between; align-items: center; }
+  #trainer-view .tv-header h1 { color: #fff; font-size: 18px; }
+  #trainer-view .tv-content { padding: 16px; max-width: 640px; margin: 0 auto; }
+  #trainer-view .class-card { background: #fff; border-radius: var(--radius); padding: 14px; margin-bottom: 12px; box-shadow: var(--shadow); font-size: 15px; }
+  #trainer-view .class-card h3 { font-size: 16px; }
+  #trainer-view .student-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-top: 1px solid var(--border); font-size: 14px; }
+  #trainer-view .student-row label { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 400; color: var(--text); margin: 0; }
+  #trainer-view input[type=checkbox] { width: auto; }
+
+  .tabs { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
+  .tabs button { background: #fff; border: 1px solid var(--border); padding: 6px 14px; border-radius: 999px; font-size: 13px; }
+  .tabs button.active { background: var(--court); color: #fff; border-color: var(--court); }
+
+  @media (max-width: 780px) {
+    #app.active { flex-direction: column; }
+    #sidebar { width: 100%; }
+    #content { max-height: none; }
+  }
+</style>
+</head>
+<body>
+
+<div id="login-screen">
+  <div class="auth-box">
+    <h1>Bamvolea Sportcity Valencia</h1>
+    <p class="muted">Accede con tu cuenta de equipo.</p>
+    <div id="login-error" class="warn hidden"></div>
+    <form id="login-form">
+      <div class="field"><label>Email</label><input type="email" id="login-email" required autocomplete="username" /></div>
+      <div class="field"><label>Contraseña</label><input type="password" id="login-pass" required autocomplete="current-password" /></div>
+      <button class="btn" type="submit" style="width:100%">Entrar</button>
+    </form>
+    <div class="auth-switch"><a href="#" id="go-trainer-pin">Soy entrenador/a &rarr; Vista entrenador (PIN)</a></div>
+  </div>
+</div>
+
+<div id="trainer-pin-screen" class="hidden">
+  <div class="auth-box">
+    <h1>Vista entrenador</h1>
+    <p class="muted">Introduce tu PIN personal.</p>
+    <div id="pin-error" class="warn hidden"></div>
+    <form id="pin-form">
+      <div class="field"><label>PIN</label><input type="password" id="trainer-pin" inputmode="numeric" required /></div>
+      <button class="btn" type="submit" style="width:100%">Entrar</button>
+    </form>
+    <div class="auth-switch"><a href="#" id="go-login">&larr; Volver al acceso normal</a></div>
+  </div>
+</div>
+
+<div id="app">
+  <div id="sidebar">
+    <div class="brand">🎾 Bamvolea Sportcity<br/>Valencia</div>
+    <div class="club-select">
+      <label style="color:rgba(255,255,255,.7)">Club</label>
+      <select id="club-selector"></select>
+    </div>
+    <nav id="nav-blocks"></nav>
+    <div class="user-box">
+      <div id="user-name">-</div>
+      <div class="muted" id="user-role" style="color:rgba(255,255,255,.6)">-</div>
+      <button class="btn secondary small" id="logout-btn">Cerrar sesión</button>
+    </div>
+  </div>
+  <div id="content"></div>
+</div>
+
+<div id="trainer-view">
+  <div class="tv-header">
+    <h1 id="tv-trainer-name">Vista entrenador</h1>
+    <button class="btn secondary small" id="tv-logout">Salir</button>
+  </div>
+  <div class="tv-content" id="tv-content"></div>
+</div>
+
+<div id="toast-box"></div>
+<div id="notif-panel" class="hidden">
+  <div class="notif-head"><span>Notificaciones</span><button id="notif-close" class="btn secondary small">Cerrar</button></div>
+  <div class="notif-body" id="notif-body"></div>
+</div>
+
+<script type="module">
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+// =========================================================
+// CONFIG - sustituye por los datos de tu propio proyecto Supabase
+// =========================================================
+const SUPABASE_URL = window.SUPABASE_URL || 'https://TU-PROYECTO.supabase.co';
+const SUPABASE_ANON_KEY = window.SUPABASE_ANON_KEY || 'TU-ANON-KEY';
+const CLUB_BRAND = 'Bamvolea Sportcity Valencia';
+// Email del proveedor externo (ej. catering) a avisar cuando se marca esa
+// opción al crear un evento. Déjalo vacío para desactivar el aviso.
+const EVENTOS_PROVEEDOR_EMAIL = window.EVENTOS_PROVEEDOR_EMAIL || '';
+const CATEGORIA_COLORS = {
+  'Torneo externo': '#7a4fb5', 'Alquiler empresa': '#2f6f4f', 'Actividad puntual': '#d98c3a', 'Otro': '#66756f',
+};
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const FN_URL = `${SUPABASE_URL}/functions/v1`;
+
+const DIAS = ['lunes','martes','miercoles','jueves','viernes','sabado','domingo'];
+const DIAS_LABEL = { lunes:'Lunes', martes:'Martes', miercoles:'Miércoles', jueves:'Jueves', viernes:'Viernes', sabado:'Sábado', domingo:'Domingo' };
+const URGENCIAS = ['baja','media','urgente','muy_urgente'];
+const URGENCIA_LABEL = { baja:'Baja', media:'Media', urgente:'Urgente', muy_urgente:'Muy urgente' };
+
+// =========================================================
+// ESTADO GLOBAL
+// =========================================================
+const state = {
+  user: null,
+  profile: null,
+  clubs: [],
+  selectedClubId: null,
+  trainers: [],
+  classTypes: [],
+  emailTemplates: [],
+  trainerSession: null, // { id, name, clubs, color, pin } cuando se entra por Vista entrenador
+  notifSubs: [], // tareas marcadas "avisarme cuando se resuelva"
+};
+
+// =========================================================
+// UTILIDADES
+// =========================================================
+function el(html) {
+  const t = document.createElement('template');
+  t.innerHTML = html.trim();
+  return t.content.firstElementChild;
+}
+function qs(sel, root = document) { return root.querySelector(sel); }
+function qsa(sel, root = document) { return [...root.querySelectorAll(sel)]; }
+function esc(s) { return String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function toast(msg, isError = false) {
+  const box = qs('#toast-box');
+  const t = el(`<div class="toast ${isError ? 'error' : ''}">${esc(msg)}</div>`);
+  box.appendChild(t);
+  setTimeout(() => t.remove(), 4500);
+}
+function fmtDate(d) {
+  if (!d) return '';
+  const dt = typeof d === 'string' ? new Date(d + (d.length === 10 ? 'T00:00:00' : '')) : d;
+  return dt.toLocaleDateString('es-ES');
+}
+function todayISO() { return new Date().toISOString().slice(0, 10); }
+function currentClub() { return state.clubs.find((c) => c.id === state.selectedClubId); }
+
+async function uploadAttachment(file) {
+  const path = `${Date.now()}_${file.name}`;
+  const { error } = await supabase.storage.from('attachments').upload(path, file);
+  if (error) throw error;
+  const { data } = supabase.storage.from('attachments').getPublicUrl(path);
+  return { url: data.publicUrl, name: file.name };
+}
+
+async function sendEmail({ to, subject, html, attachmentUrl, attachmentName }) {
+  const { data: sess } = await supabase.auth.getSession();
+  const res = await fetch(`${FN_URL}/send-email`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${sess.session.access_token}`,
+      apikey: SUPABASE_ANON_KEY,
+    },
+    body: JSON.stringify({ to, subject, html, attachmentUrl, attachmentName }),
+  });
+  if (!res.ok) {
+    // El SDK de Supabase no desenvuelve el motivo real de un fallo de Edge
+    // Function; aquí leemos el cuerpo directamente porque llamamos por fetch.
+    const text = await res.text();
+    throw new Error(`Fallo enviando email: ${text}`);
+  }
+  return res.json();
+}
+
+function fillTemplate(body, vars) {
+  return body.replace(/\{\{(\w+)\}\}/g, (_, key) => esc(vars[key] ?? ''));
+}
+
+async function fetchPlaytomicBookings(from, to) {
+  const { data: sess } = await supabase.auth.getSession();
+  const res = await fetch(`${FN_URL}/playtomic-proxy?from=${from}&to=${to}`, {
+    headers: { Authorization: `Bearer ${sess.session.access_token}`, apikey: SUPABASE_ANON_KEY },
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Playtomic: ${text}`);
+  }
+  return (await res.json()).bookings;
+}
+
+function openModal(title, bodyHtml, { wide = false } = {}) {
+  const backdrop = el(`<div class="modal-backdrop"><div class="modal" style="${wide ? 'width:720px' : ''}">
+    <button class="close-x">&times;</button><h2>${esc(title)}</h2><div class="modal-body"></div>
+  </div></div>`);
+  qs('.modal-body', backdrop).innerHTML = bodyHtml;
+  document.body.appendChild(backdrop);
+  qs('.close-x', backdrop).onclick = () => backdrop.remove();
+  backdrop.addEventListener('click', (e) => { if (e.target === backdrop) backdrop.remove(); });
+  return backdrop;
+}
+
+// =========================================================
+// NAVEGACIÓN (menú de dos niveles, filtrado por rol)
+// =========================================================
+const NAV = [
+  { key: 'guia', title: 'Guía', roles: 'all', items: [{ key: 'guia', label: 'Guía de uso' }] },
+  { key: 'tareas', title: 'Tareas', roles: 'all', items: [{ key: 'tareas', label: 'Tablón de tareas' }] },
+  { key: 'academia', title: 'Academia', roles: ['admin','front_desk','administracion','coordinacion','direccion'], items: [
+    { key: 'parrilla', label: 'Parrilla' },
+    { key: 'espera', label: 'Lista de espera' },
+    { key: 'alumnos', label: 'Alumnos' },
+    { key: 'grupos', label: 'Grupos' },
+    { key: 'planificacion', label: 'Planificación' },
+    { key: 'kpis', label: 'KPIs' },
+  ]},
+  { key: 'entrenador', title: 'Entrenador', roles: ['admin','coordinacion','direccion'], items: [
+    { key: 'entrenadores', label: 'Entrenadores' },
+    { key: 'nivelacion', label: 'Alumnos (nivelación)' },
+  ]},
+  // Cuentas con role='entrenador' (poco frecuente: la mayoría usa el PIN de
+  // Vista entrenador sin cuenta de Auth) ven solo su propio bloque reducido.
+  { key: 'mivista', title: 'Entrenador', roles: ['entrenador'], items: [
+    { key: 'mivista', label: 'Mi vista' },
+  ]},
+  { key: 'eventos', title: 'Eventos', roles: ['admin','coordinacion','direccion','front_desk'], items: [
+    { key: 'eventos', label: 'Calendario de eventos' },
+  ]},
+  { key: 'gestion', title: 'Gestión', roles: ['admin','direccion','administracion'], items: [
+    { key: 'plantillas', label: 'Plantillas de email' },
+    { key: 'playtomic', label: 'Playtomic Manager' },
+  ]},
+];
+
+function navVisibleFor(role) {
+  return NAV.filter((b) => b.roles === 'all' || b.roles.includes(role));
+}
+
+function renderNav() {
+  const box = qs('#nav-blocks');
+  box.innerHTML = '';
+  const blocks = navVisibleFor(state.profile.role);
+  blocks.forEach((block, i) => {
+    const b = el(`<div class="nav-block ${i === 0 ? 'open' : ''}">
+      <div class="nav-block-title">${esc(block.title)} <span>${i === 0 ? '&minus;' : '+'}</span></div>
+      <div class="nav-sub">${block.items.map((it) => `<a href="#${it.key}" data-key="${it.key}">${esc(it.label)}</a>`).join('')}</div>
+    </div>`);
+    qs('.nav-block-title', b).onclick = () => {
+      const wasOpen = b.classList.contains('open');
+      qsa('.nav-block', box).forEach((x) => x.classList.remove('open'));
+      qsa('.nav-block-title span', box).forEach((s) => (s.textContent = '+'));
+      if (!wasOpen) { b.classList.add('open'); qs('.nav-block-title span', b).textContent = '−'; }
+    };
+    box.appendChild(b);
+  });
+}
+
+async function router() {
+  const key = (location.hash || '#guia').slice(1);
+  qsa('#nav-blocks a').forEach((a) => a.classList.toggle('active', a.dataset.key === key));
+  const content = qs('#content');
+  content.innerHTML = '<p class="muted">Cargando…</p>';
+  const mod = MODULES[key] || MODULES.guia;
+  try {
+    await mod(content);
+  } catch (err) {
+    console.error(err);
+    content.innerHTML = `<div class="warn">No se pudo cargar esta sección: ${esc(err.message || err)}</div>`;
+  }
+}
+window.addEventListener('hashchange', router);
+
+// =========================================================
+// AUTENTICACIÓN
+// =========================================================
+qs('#go-trainer-pin').onclick = (e) => { e.preventDefault(); qs('#login-screen').classList.add('hidden'); qs('#trainer-pin-screen').classList.remove('hidden'); };
+qs('#go-login').onclick = (e) => { e.preventDefault(); qs('#trainer-pin-screen').classList.add('hidden'); qs('#login-screen').classList.remove('hidden'); };
+
+qs('#login-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  qs('#login-error').classList.add('hidden');
+  const email = qs('#login-email').value.trim();
+  const password = qs('#login-pass').value;
+  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) {
+    qs('#login-error').textContent = 'No hemos podido entrar: revisa el email y la contraseña.';
+    qs('#login-error').classList.remove('hidden');
+    return;
+  }
+  await bootstrapApp();
+});
+
+qs('#pin-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  qs('#pin-error').classList.add('hidden');
+  const pin = qs('#trainer-pin').value.trim();
+  const { data, error } = await supabase.rpc('rpc_trainer_login', { p_pin: pin });
+  if (error || !data || !data.length) {
+    qs('#pin-error').textContent = 'PIN incorrecto.';
+    qs('#pin-error').classList.remove('hidden');
+    return;
+  }
+  state.trainerSession = { ...data[0], pin };
+  localStorage.setItem('trainerSession', JSON.stringify(state.trainerSession));
+  qs('#trainer-pin-screen').classList.add('hidden');
+  await bootstrapTrainerView();
+});
+
+qs('#logout-btn').onclick = async () => { await supabase.auth.signOut(); location.reload(); };
+qs('#tv-logout').onclick = () => { localStorage.removeItem('trainerSession'); location.reload(); };
+
+async function bootstrapApp() {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+  state.user = user;
+  const { data: profile, error } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+  if (error || !profile) {
+    toast('Tu usuario no tiene un perfil/rol asignado. Pide a un admin que te dé de alta en "profiles".', true);
+    await supabase.auth.signOut();
+    return;
+  }
+  state.profile = profile;
+
+  const { data: clubs } = await supabase.from('clubs').select('*').order('name');
+  state.clubs = clubs || [];
+  const accessibleClubs = profile.role === 'admin' ? state.clubs : state.clubs.filter((c) => profile.club_ids.includes(c.id));
+  const clubSelect = qs('#club-selector');
+  clubSelect.innerHTML = accessibleClubs.map((c) => `<option value="${c.id}">${esc(c.name)}</option>`).join('');
+  state.selectedClubId = localStorage.getItem('selectedClubId') && accessibleClubs.some(c => c.id === localStorage.getItem('selectedClubId'))
+    ? localStorage.getItem('selectedClubId') : accessibleClubs[0]?.id;
+  clubSelect.value = state.selectedClubId;
+  clubSelect.onchange = () => { state.selectedClubId = clubSelect.value; localStorage.setItem('selectedClubId', state.selectedClubId); router(); };
+
+  const [{ data: trainers }, { data: classTypes }, { data: templates }] = await Promise.all([
+    supabase.from('trainers').select('*').order('name'),
+    supabase.from('class_types').select('*'),
+    supabase.from('email_templates').select('*'),
+  ]);
+  state.trainers = trainers || [];
+  state.classTypes = classTypes || [];
+  state.emailTemplates = templates || [];
+
+  qs('#user-name').textContent = profile.full_name;
+  qs('#user-role').textContent = ROLE_LABEL[profile.role] || profile.role;
+  renderNav();
+  qs('#login-screen').classList.add('hidden');
+  qs('#app').classList.add('active');
+  router();
+  loadNotifSubs();
+}
+
+const ROLE_LABEL = {
+  admin: 'Administrador/a', front_desk: 'Recepción', administracion: 'Administración',
+  coordinacion: 'Coordinación', entrenador: 'Entrenador/a', direccion: 'Dirección',
+};
+
+supabase.auth.onAuthStateChange((event) => {
+  if (event === 'SIGNED_OUT') location.reload();
+});
+
+(async function init() {
+  const savedTrainer = localStorage.getItem('trainerSession');
+  const { data: { session } } = await supabase.auth.getSession();
+  if (session) {
+    await bootstrapApp();
+  } else if (savedTrainer) {
+    state.trainerSession = JSON.parse(savedTrainer);
+    await bootstrapTrainerView();
+  }
+})();
+
+// =========================================================
+// HELPERS COMPARTIDOS: ALUMNOS
+// =========================================================
+function ageBracket(birthdate) {
+  if (!birthdate) return null;
+  const age = Math.floor((Date.now() - new Date(birthdate).getTime()) / (365.25 * 24 * 3600 * 1000));
+  return age < 18 ? 'infantil' : 'adultos';
+}
+async function fetchStudentsView(clubId) {
+  const { data, error } = await supabase.from('students_view').select('*').eq('club_id', clubId).order('name');
+  if (error) throw error;
+  return data || [];
+}
+async function fetchClassStudentIds(clubId) {
+  const { data, error } = await supabase.from('class_students').select('student_id, classes!inner(club_id)').eq('classes.club_id', clubId);
+  if (error) throw error;
+  return new Set((data || []).map((r) => r.student_id));
+}
+
+// =========================================================
+// MÓDULOS
+// =========================================================
+const MODULES = {};
+
+// ---------- GUÍA ----------
+MODULES.guia = async (content) => {
+  content.innerHTML = `
+    <h1>Guía de uso</h1>
+    <p class="muted">Documentación rápida para el día a día. Si algo no está aquí, pregunta a coordinación.</p>
+    <div class="card"><h2>Tareas</h2>
+      <p>El tablón de Tareas es el buzón interno entre secciones. Crea una tarea, elige la sección destino y la urgencia.</p>
+      <div class="tip">Si marcas una tarea como "Urgente" o "Muy urgente" dirigida a una sección que consulta el email, se envía un aviso automático.</div>
+      <div class="tip">Las tareas hechas o canceladas desaparecen de la lista a las 48h para no acumular ruido, pero siguen guardadas.</div>
+    </div>
+    <div class="card"><h2>Academia &gt; Parrilla</h2>
+      <p>Es el horario real de clases. Pincha un hueco vacío para crear una clase; pincha una clase existente para editarla o asignar alumnos.</p>
+      <div class="warn">Si asignas a un entrenador fuera de su disponibilidad declarada, o compartes pista a la misma hora, el sistema te avisará con un borde naranja.</div>
+    </div>
+    <div class="card"><h2>Academia &gt; Lista de espera</h2>
+      <p>No es una lista manual: aparece aquí cualquier alumno activo sin clase asignada. En cuanto se le asigna una clase en la Parrilla, desaparece solo.</p>
+    </div>
+    <div class="card"><h2>Academia &gt; Grupos</h2>
+      <p>Sirve para organizar internamente quién iría bien junto ANTES de crear la clase de verdad en la Parrilla. Crear un grupo aquí nunca publica nada de cara al cliente.</p>
+    </div>
+    <div class="card"><h2>Entrenador &gt; Vista entrenador</h2>
+      <p>Cada entrenador/a entra con su PIN personal desde la pantalla de acceso ("Soy entrenador/a"), sin necesitar usuario y contraseña. Ahí ve solo sus propias clases.</p>
+    </div>
+    <div class="card"><h2>Eventos</h2>
+      <p>El calendario de Eventos (alquileres, torneos externos, empresas) se ve siempre completo con todos los clubs a la vez, para poder cuadrar pistas compartidas entre sedes.</p>
+    </div>
+  `;
+};
+
+// ---------- TAREAS ----------
+MODULES.tareas = async (content) => {
+  const club = currentClub();
+  content.innerHTML = `
+    <div class="content-header"><h1>Tareas</h1><button class="btn" id="new-task">+ Nueva tarea</button></div>
+    <div class="tabs" id="task-view-tabs">
+      <button class="active" data-v="lista">Lista</button><button data-v="semana">Semana</button><button data-v="mes">Mes</button>
+    </div>
+    <div id="task-body"></div>
+  `;
+  let view = 'lista';
+  qsa('#task-view-tabs button').forEach((b) => b.onclick = () => { view = b.dataset.v; qsa('#task-view-tabs button').forEach(x=>x.classList.remove('active')); b.classList.add('active'); renderTasks(); });
+  qs('#new-task').onclick = () => openTaskForm();
+
+  async function fetchTasks() {
+    const { data, error } = await supabase.from('tasks').select('*, target_trainer:trainers(name)').order('due_date', { ascending: true });
+    if (error) throw error;
+    const cutoff = Date.now() - 48 * 3600 * 1000;
+    return (data || []).filter((t) => t.status === 'pendiente' || !t.resolved_at || new Date(t.resolved_at).getTime() > cutoff);
+  }
+
+  async function renderTasks() {
+    const tasks = await fetchTasks();
+    const body = qs('#task-body');
+    if (view === 'lista') {
+      const ordered = [...tasks].sort((a, b) => {
+        const ui = URGENCIAS.indexOf(b.urgency) - URGENCIAS.indexOf(a.urgency);
+        if (ui !== 0) return ui;
+        return (a.due_date || '9999').localeCompare(b.due_date || '9999');
+      });
+      body.innerHTML = `<table><thead><tr><th>Urgencia</th><th>Descripción</th><th>Sección</th><th>Límite</th><th>Creada por</th><th>Estado</th><th></th></tr></thead>
+        <tbody>${ordered.map(taskRow).join('') || '<tr><td colspan="7" class="muted">No hay tareas.</td></tr>'}</tbody></table>`;
+    } else {
+      const byDay = {};
+      tasks.forEach((t) => { if (t.due_date) (byDay[t.due_date] ??= []).push(t); });
+      const days = Object.keys(byDay).sort();
+      body.innerHTML = days.length
+        ? days.map((d) => `<div class="card" style="margin-bottom:10px"><h3>${fmtDate(d)}</h3>${byDay[d].map(taskLine).join('')}</div>`).join('')
+        : '<p class="muted">No hay tareas con fecha límite.</p>';
+    }
+    qsa('.task-done', body).forEach((b) => b.onclick = () => setTaskStatus(b.dataset.id, 'hecho'));
+    qsa('.task-cancel', body).forEach((b) => b.onclick = () => setTaskStatus(b.dataset.id, 'cancelada'));
+    qsa('.task-edit', body).forEach((b) => b.onclick = () => openTaskForm(tasks.find((t) => t.id === b.dataset.id)));
+  }
+
+  function taskRow(t) {
+    return `<tr>
+      <td><span class="pill ${t.urgency === 'muy_urgente' || t.urgency === 'urgente' ? 'baja' : 'espera'}">${URGENCIA_LABEL[t.urgency]}</span></td>
+      <td class="task-edit" data-id="${t.id}" style="cursor:pointer">${esc(t.description)}</td>
+      <td>${esc(t.target_section)}${t.target_trainer ? ' · ' + esc(t.target_trainer.name) : ''}</td>
+      <td>${t.due_date ? fmtDate(t.due_date) : '-'}</td>
+      <td>${esc(t.created_by_name)}</td>
+      <td>${t.status}</td>
+      <td>${t.status === 'pendiente' ? `<button class="btn small task-done" data-id="${t.id}">Hecho</button> <button class="btn small secondary task-cancel" data-id="${t.id}">Cancelar</button>` : ''}</td>
+    </tr>`;
+  }
+  function taskLine(t) {
+    return `<div class="muted">${URGENCIA_LABEL[t.urgency]} · ${esc(t.description)} (${esc(t.target_section)})</div>`;
+  }
+
+  async function setTaskStatus(id, status) {
+    const { error } = await supabase.from('tasks').update({ status, resolved_at: new Date().toISOString() }).eq('id', id);
+    if (error) return toast(error.message, true);
+    const task = (await supabase.from('tasks').select('*').eq('id', id).single()).data;
+    if (task?.notify_creator) pushNotif(`Tarea resuelta: ${task.description}`);
+    toast('Tarea actualizada.');
+    renderTasks();
+  }
+
+  function openTaskForm(task) {
+    const modal = openModal(task ? 'Editar tarea' : 'Nueva tarea', `
+      <div class="field"><label>Descripción</label><textarea id="f-desc" rows="3">${esc(task?.description || '')}</textarea></div>
+      <div class="row">
+        <div class="field"><label>Urgencia</label><select id="f-urg">${URGENCIAS.map((u) => `<option value="${u}" ${task?.urgency===u?'selected':''}>${URGENCIA_LABEL[u]}</option>`).join('')}</select></div>
+        <div class="field"><label>Sección destino</label><input id="f-section" value="${esc(task?.target_section || '')}" placeholder="ej. recepción, mantenimiento…" /></div>
+      </div>
+      <div class="row">
+        <div class="field"><label>Entrenador (opcional)</label><select id="f-trainer"><option value="">-</option>${state.trainers.map((t) => `<option value="${t.id}" ${task?.target_trainer_id===t.id?'selected':''}>${esc(t.name)}</option>`).join('')}</select></div>
+        <div class="field"><label>Fecha límite (opcional)</label><input type="date" id="f-due" value="${task?.due_date || ''}" /></div>
+      </div>
+      <div class="field"><label>Adjunto (opcional)</label><input type="file" id="f-file" /></div>
+      <div class="field"><label><input type="checkbox" id="f-notify" style="width:auto" ${task?.notify_creator?'checked':''}/> Avisarme cuando se resuelva</label></div>
+      <button class="btn" id="f-save" style="width:100%">Guardar</button>
+    `);
+    qs('#f-save', modal).onclick = async () => {
+      let attachment_url = task?.attachment_url || null;
+      const file = qs('#f-file', modal).files[0];
+      if (file) { const up = await uploadAttachment(file); attachment_url = up.url; }
+      const payload = {
+        description: qs('#f-desc', modal).value.trim(),
+        urgency: qs('#f-urg', modal).value,
+        target_section: qs('#f-section', modal).value.trim(),
+        target_trainer_id: qs('#f-trainer', modal).value || null,
+        due_date: qs('#f-due', modal).value || null,
+        attachment_url,
+        notify_creator: qs('#f-notify', modal).checked,
+        created_section: state.profile.role,
+        created_by_name: state.profile.full_name,
+        club_id: state.selectedClubId,
+      };
+      if (!payload.description || !payload.target_section) return toast('Descripción y sección son obligatorias.', true);
+      const { error, data } = task
+        ? await supabase.from('tasks').update(payload).eq('id', task.id).select().single()
+        : await supabase.from('tasks').insert(payload).select().single();
+      if (error) return toast(error.message, true);
+      if ((data.urgency === 'urgente' || data.urgency === 'muy_urgente')) {
+        notifySectionByEmail(data).catch((e) => console.warn('Aviso email tarea falló', e));
+      }
+      modal.remove();
+      toast('Tarea guardada.');
+      renderTasks();
+    };
+  }
+
+  async function notifySectionByEmail(task) {
+    // Busca perfiles cuyo rol coincide textualmente con la sección destino
+    // y que tengan email registrado; si nadie encaja, no se envía nada.
+    const { data: profiles } = await supabase.from('profiles').select('full_name, role, email');
+    const targets = (profiles || []).filter((p) => p.role === task.target_section && p.email);
+    if (!targets.length) return;
+    await sendEmail({
+      to: targets.map((p) => p.email),
+      subject: `[${URGENCIA_LABEL[task.urgency]}] Nueva tarea para ${task.target_section}`,
+      html: `<p>${esc(task.description)}</p><p>Creada por ${esc(task.created_by_name)}${task.due_date ? ` · límite ${fmtDate(task.due_date)}` : ''}.</p>`,
+    });
+  }
+
+  function pushNotif(msg) {
+    state.notifSubs.push({ msg, at: new Date() });
+    renderNotifPanel();
+  }
+
+  renderTasks();
+};
+
+// ---------- ACADEMIA: PARRILLA ----------
+const HOURS = Array.from({ length: 15 }, (_, i) => `${String(8 + i).padStart(2, '0')}:00`);
+
+MODULES.parrilla = async (content) => {
+  const club = currentClub();
+  if (!club) { content.innerHTML = '<p class="muted">Selecciona un club.</p>'; return; }
+  let day = DIAS[0];
+
+  content.innerHTML = `
+    <div class="content-header"><h1>Parrilla — ${esc(club.name)}</h1></div>
+    <div class="tabs" id="day-tabs">${DIAS.map((d, i) => `<button class="${i===0?'active':''}" data-d="${d}">${DIAS_LABEL[d]}</button>`).join('')}</div>
+    <div id="parrilla-body"></div>
+  `;
+  qsa('#day-tabs button').forEach((b) => b.onclick = () => { day = b.dataset.d; qsa('#day-tabs button').forEach(x=>x.classList.remove('active')); b.classList.add('active'); renderDay(); });
+
+  async function loadData() {
+    const [{ data: classes }, students, classTypes, trainersAll] = await Promise.all([
+      supabase.from('classes').select('*, class_students(student_id, students(id, name, level, birthdate))').eq('club_id', club.id),
+      fetchStudentsView(club.id),
+      supabase.from('class_types').select('*').eq('club_id', club.id).then(r => r.data || []),
+      supabase.from('classes').select('trainer_id, day, hour, club_id'), // para detectar dobles clases del mismo profesor en cualquier club
+    ]);
+    return { classes: classes || [], students, classTypes, trainersAll: trainersAll || [] };
+  }
+
+  async function renderDay() {
+    const body = qs('#parrilla-body');
+    body.innerHTML = '<p class="muted">Cargando…</p>';
+    const { classes, students, classTypes, trainersAll } = await loadData();
+    const byHour = {};
+    classes.filter((c) => c.day === day).forEach((c) => (byHour[c.hour] ??= []).push(c));
+
+    body.innerHTML = HOURS.map((h) => {
+      const items = (byHour[h] || []).map((c) => renderClassCard(c, trainersAll)).join('');
+      return `<div class="card" style="margin-bottom:8px"><div class="row" style="align-items:center">
+        <div style="flex:0 0 60px;font-weight:700">${h}</div>
+        <div style="flex:1;display:flex;gap:8px;flex-wrap:wrap">${items}
+          <button class="btn small secondary add-slot" data-hour="${h}">+ Clase</button>
+        </div>
+      </div></div>`;
+    }).join('');
+
+    qsa('.add-slot', body).forEach((b) => b.onclick = () => openClassForm(null, b.dataset.hour, classTypes));
+    qsa('.cls-card', body).forEach((b) => b.onclick = () => {
+      const c = classes.find((x) => x.id === b.dataset.id);
+      openClassForm(c, c.hour, classTypes, students);
+    });
+  }
+
+  function renderClassCard(c, trainersAll) {
+    const trainer = state.trainers.find((t) => t.id === c.trainer_id);
+    const assigned = c.class_students || [];
+    const warnings = [];
+    if (assigned.length < c.capacity) warnings.push(`${c.capacity - assigned.length} plaza(s) libre(s)`);
+    if (trainer && !trainerAvailableAt(trainer, day, c.hour)) warnings.push('Entrenador fuera de disponibilidad');
+    const doubleBooked = trainer && trainersAll.filter((x) => x.trainer_id === c.trainer_id && x.day === day && x.hour === c.hour).length > 1;
+    if (doubleBooked) warnings.push('Entrenador con otra clase a la misma hora');
+
+    const levels = assigned.map((a) => a.students?.level).filter((n) => n != null);
+    const avgLevel = levels.length ? (levels.reduce((a, b) => a + b, 0) / levels.length).toFixed(1) : '-';
+    const brackets = new Set(assigned.map((a) => ageBracket(a.students?.birthdate)).filter(Boolean));
+    const bracket = brackets.size === 1 ? [...brackets][0] : (brackets.size > 1 ? 'mixto' : '-');
+
+    return `<div class="cls cls-card ${warnings.length ? 'warn-slot' : ''}" data-id="${c.id}" style="background:${trainer?.color || 'var(--court)'}" title="${warnings.join(' · ')}">
+      ${esc(c.type)} · pista ${c.court ?? '?'}<br/>${trainer ? esc(trainer.name) : 'Sin entrenador'}<br/>
+      ${assigned.length}/${c.capacity} · nivel ${avgLevel} · ${bracket}
+      ${warnings.length ? ` ⚠️` : ''}
+    </div>`;
+  }
+
+  function openClassForm(cls, hour, classTypes, students) {
+    const allowedTypes = classTypes.filter((t) => hour < club.serious_cutoff_hour ? true : t.serio);
+    const modal = openModal(cls ? 'Editar clase' : 'Nueva clase', `
+      <div class="row">
+        <div class="field"><label>Hora</label><input value="${hour}" disabled /></div>
+        <div class="field"><label>Pista</label><input type="number" id="f-court" min="1" max="${club.num_courts}" value="${cls?.court ?? ''}" /></div>
+      </div>
+      <div class="row">
+        <div class="field"><label>Tipo</label><select id="f-type">${allowedTypes.map((t) => `<option ${cls?.type===t.name?'selected':''}>${esc(t.name)}</option>`).join('')}</select></div>
+        <div class="field"><label>Capacidad</label><input type="number" id="f-cap" value="${cls?.capacity ?? 4}" /></div>
+      </div>
+      <div class="field"><label>Entrenador</label><select id="f-trainer"><option value="">-</option>${state.trainers.filter(t=>t.clubs.includes(club.id)).map((t) => `<option value="${t.id}" ${cls?.trainer_id===t.id?'selected':''}>${esc(t.name)}</option>`).join('')}</select></div>
+      ${cls ? `<div class="field"><label>Alumnos asignados</label><div id="f-students"></div></div>` : ''}
+      <div class="row">
+        <button class="btn" id="f-save">Guardar</button>
+        ${cls ? '<button class="btn danger" id="f-del">Eliminar clase</button>' : ''}
+      </div>
+    `, { wide: !!cls });
+
+    if (cls) renderStudentAssign(modal, cls, students);
+
+    qs('#f-save', modal).onclick = async () => {
+      const payload = {
+        club_id: club.id, day, hour,
+        court: qs('#f-court', modal).value ? Number(qs('#f-court', modal).value) : null,
+        type: qs('#f-type', modal).value,
+        capacity: Number(qs('#f-cap', modal).value) || 4,
+        trainer_id: qs('#f-trainer', modal).value || null,
+      };
+      const { error } = cls
+        ? await supabase.from('classes').update(payload).eq('id', cls.id)
+        : await supabase.from('classes').insert(payload);
+      if (error) return toast(error.message, true);
+      modal.remove(); toast('Clase guardada.'); renderDay();
+    };
+    if (cls) qs('#f-del', modal).onclick = async () => {
+      if (!confirm('¿Eliminar esta clase? Los alumnos asignados pasarán a lista de espera.')) return;
+      const { error } = await supabase.from('classes').delete().eq('id', cls.id);
+      if (error) return toast(error.message, true);
+      modal.remove(); toast('Clase eliminada.'); renderDay();
+    };
+  }
+
+  function renderStudentAssign(modal, cls, students) {
+    const box = qs('#f-students', modal);
+    const assignedIds = new Set((cls.class_students || []).map((cs) => cs.student_id));
+    box.innerHTML = `<select id="f-add-student"><option value="">+ Añadir alumno…</option>
+      ${students.filter((s) => !assignedIds.has(s.id) && s.computed_status !== 'baja').map((s) => `<option value="${s.id}">${esc(s.name)} (nivel ${s.level ?? '-'})</option>`).join('')}
+      </select>
+      <div id="assigned-list" style="margin-top:8px">${[...assignedIds].map((id) => {
+        const s = students.find((x) => x.id === id);
+        return `<div class="student-row" style="display:flex;justify-content:space-between;padding:4px 0">${esc(s?.name || id)} <button class="btn small secondary remove-student" data-id="${id}">Quitar</button></div>`;
+      }).join('')}</div>`;
+    qs('#f-add-student', box).onchange = async (e) => {
+      const sid = e.target.value; if (!sid) return;
+      const { error } = await supabase.from('class_students').insert({ class_id: cls.id, student_id: sid });
+      if (error) return toast(error.message, true);
+      cls.class_students.push({ student_id: sid, students: students.find((s) => s.id === sid) });
+      renderStudentAssign(modal, cls, students);
+    };
+    qsa('.remove-student', box).forEach((b) => b.onclick = async () => {
+      const { error } = await supabase.from('class_students').delete().eq('class_id', cls.id).eq('student_id', b.dataset.id);
+      if (error) return toast(error.message, true);
+      cls.class_students = cls.class_students.filter((cs) => cs.student_id !== b.dataset.id);
+      renderStudentAssign(modal, cls, students);
+    });
+  }
+
+  renderDay();
+};
+
+function trainerAvailableAt(trainer, day, hour) {
+  const ranges = trainer.availability?.[day];
+  if (!ranges || !ranges.length) return true; // sin disponibilidad declarada = no se restringe
+  return ranges.some(([start, end]) => hour >= start && hour < end);
+}
+
+// ---------- ACADEMIA: LISTA DE ESPERA ----------
+MODULES.espera = async (content) => {
+  const club = currentClub();
+  content.innerHTML = `<div class="content-header"><h1>Lista de espera</h1></div><div id="espera-body"><p class="muted">Cargando…</p></div>`;
+  const students = await fetchStudentsView(club.id);
+  const waiting = students.filter((s) => s.computed_status === 'espera')
+    .sort((a, b) => b.weeks_waiting - a.weeks_waiting);
+
+  const body = qs('#espera-body');
+  if (!waiting.length) { body.innerHTML = '<p class="muted">No hay nadie en lista de espera ahora mismo.</p>'; return; }
+
+  const { data: allClasses } = await supabase.from('classes').select('*, class_students(student_id, students(level, birthdate))').eq('club_id', club.id);
+
+  body.innerHTML = `<table><thead><tr><th>Alumno</th><th>Nivel</th><th>Producto</th><th>Días preferidos</th><th>Esperando</th><th>Huecos sugeridos</th></tr></thead>
+    <tbody>${waiting.map((s) => {
+      const suggestions = suggestSlotsFor(s, allClasses || []);
+      return `<tr>
+        <td>${esc(s.name)}</td>
+        <td>${s.level ?? '-'}</td>
+        <td>${esc(s.interested_product || '-')}</td>
+        <td>${(s.available_days || []).map((d) => DIAS_LABEL[d] || d).join(', ') || '-'}</td>
+        <td>${s.weeks_waiting >= 4 ? `<span class="pill baja">${s.weeks_waiting} sem.</span>` : `${s.weeks_waiting} sem.`}</td>
+        <td>${suggestions.length ? suggestions.map((c) => `<span class="pill activo">${DIAS_LABEL[c.day]} ${c.hour}</span>`).join(' ') : '<span class="muted">Sin coincidencias</span>'}</td>
+      </tr>`;
+    }).join('')}</tbody></table>`;
+};
+
+function suggestSlotsFor(student, classes) {
+  const LEVEL_MARGIN = 0.5;
+  return classes.filter((c) => {
+    const assigned = c.class_students || [];
+    if (assigned.length >= c.capacity) return false;
+    if (student.available_days?.length && !student.available_days.includes(c.day)) return false;
+    if (student.interested_product === 'particular' && c.type !== 'Particular') return false;
+
+    const levels = assigned.map((a) => a.students?.level).filter((n) => n != null);
+    if (levels.length && student.level != null) {
+      const avgLevel = levels.reduce((a, b) => a + b, 0) / levels.length;
+      if (Math.abs(avgLevel - student.level) > LEVEL_MARGIN) return false;
+    }
+    const brackets = new Set(assigned.map((a) => ageBracket(a.students?.birthdate)).filter(Boolean));
+    const studentBracket = ageBracket(student.birthdate);
+    if (brackets.size && studentBracket && !brackets.has(studentBracket)) return false;
+    return true;
+  }).slice(0, 5);
+}
+
+// ---------- ACADEMIA: ALUMNOS ----------
+MODULES.alumnos = async (content) => {
+  const club = currentClub();
+  content.innerHTML = `
+    <div class="content-header"><h1>Alumnos — ${esc(club.name)}</h1>
+      <div class="row" style="flex:0 0 auto">
+        <input type="file" id="csv-input" accept=".csv" class="hidden" />
+        <button class="btn secondary" id="csv-btn">Importar CSV</button>
+        <button class="btn secondary" id="mass-email-btn">Email masivo</button>
+        <button class="btn" id="new-student-btn">+ Alumno</button>
+      </div>
+    </div>
+    <div class="kpi-row" id="student-summary"></div>
+    <div class="field" style="max-width:280px"><input id="student-search" placeholder="Buscar por nombre…" /></div>
+    <div id="students-table"><p class="muted">Cargando…</p></div>
+  `;
+  let students = await fetchStudentsView(club.id);
+  const attendancePct = await computeAttendancePct(students.map((s) => s.id));
+
+  renderSummary();
+  renderTable();
+
+  qs('#student-search').oninput = (e) => renderTable(e.target.value.toLowerCase());
+  qs('#new-student-btn').onclick = () => openStudentForm();
+  qs('#csv-btn').onclick = () => qs('#csv-input').click();
+  qs('#csv-input').onchange = (e) => importCsv(e.target.files[0]);
+  qs('#mass-email-btn').onclick = () => openMassEmail(students);
+
+  function renderSummary() {
+    const counts = { activo: 0, espera: 0, baja: 0 };
+    students.forEach((s) => counts[s.computed_status]++);
+    qs('#student-summary').innerHTML = `
+      <div class="kpi-card"><div class="num">${counts.activo}</div><div class="label">Activos</div></div>
+      <div class="kpi-card"><div class="num">${counts.espera}</div><div class="label">En espera</div></div>
+      <div class="kpi-card"><div class="num">${counts.baja}</div><div class="label">Bajas</div></div>
+      <div class="kpi-card"><div class="num">${students.filter((s) => s.morose).length}</div><div class="label">Pago pendiente</div></div>
+    `;
+  }
+
+  function renderTable(filter = '') {
+    const rows = students.filter((s) => s.name.toLowerCase().includes(filter));
+    qs('#students-table').innerHTML = `<table><thead><tr>
+      <th>Nombre</th><th>Estado</th><th>Nivel</th><th>Club</th><th>Pago</th><th>Welcome pack</th><th>Asistencia mes</th><th></th>
+    </tr></thead><tbody>${rows.map((s) => `<tr>
+      <td>${esc(s.name)}</td>
+      <td><span class="pill ${s.computed_status}">${s.computed_status}</span></td>
+      <td>${s.level ?? '-'}</td>
+      <td>${esc(club.name)}</td>
+      <td>${s.morose ? '<span class="pill espera">Pendiente</span>' : '<span class="pill activo">Al día</span>'}</td>
+      <td><input type="checkbox" class="wp-check" data-id="${s.id}" ${s.welcome_pack_received ? 'checked' : ''} /></td>
+      <td>${attendancePct[s.id] != null ? attendancePct[s.id] + '%' : '-'}</td>
+      <td><button class="btn small secondary edit-student" data-id="${s.id}">Editar</button></td>
+    </tr>`).join('') || '<tr><td colspan="8" class="muted">Sin resultados.</td></tr>'}</tbody></table>`;
+
+    qsa('.wp-check', qs('#students-table')).forEach((cb) => cb.onchange = async () => {
+      const { error } = await supabase.from('students').update({ welcome_pack_received: cb.checked }).eq('id', cb.dataset.id);
+      if (error) { toast(error.message, true); cb.checked = !cb.checked; }
+    });
+    qsa('.edit-student', qs('#students-table')).forEach((b) => b.onclick = () => openStudentForm(students.find((s) => s.id === b.dataset.id)));
+  }
+
+  function openStudentForm(student) {
+    const modal = openModal(student ? 'Editar alumno' : 'Nuevo alumno', `
+      <div class="row">
+        <div class="field"><label>Nombre</label><input id="f-name" value="${esc(student?.name || '')}" /></div>
+        <div class="field"><label>Nivel</label><input type="number" step="0.1" id="f-level" value="${student?.level ?? ''}" /></div>
+      </div>
+      <div class="row">
+        <div class="field"><label>Email</label><input type="email" id="f-email" value="${esc(student?.email || '')}" /></div>
+        <div class="field"><label>Teléfono</label><input id="f-phone" value="${esc(student?.phone || '')}" /></div>
+      </div>
+      <div class="row">
+        <div class="field"><label>Fecha nacimiento</label><input type="date" id="f-birth" value="${student?.birthdate || ''}" /></div>
+        <div class="field"><label>Sexo</label><select id="f-sexo"><option value="">-</option><option value="F" ${student?.sexo==='F'?'selected':''}>F</option><option value="M" ${student?.sexo==='M'?'selected':''}>M</option></select></div>
+      </div>
+      <div class="row">
+        <div class="field"><label>Producto de interés</label><input id="f-product" value="${esc(student?.interested_product || '')}" placeholder="curso, particular, bono…" /></div>
+        <div class="field"><label>Días disponibles</label><input id="f-days" value="${(student?.available_days||[]).join(',')}" placeholder="lunes,miercoles" /></div>
+      </div>
+      <div class="field"><label><input type="checkbox" id="f-morose" style="width:auto" ${student?.morose?'checked':''}/> Pago pendiente</label></div>
+      <div class="field"><label><input type="checkbox" id="f-baja" style="width:auto" ${student?.status==='baja'?'checked':''}/> Dar de baja</label></div>
+      <button class="btn" id="f-save" style="width:100%">Guardar</button>
+    `);
+    qs('#f-save', modal).onclick = async () => {
+      const payload = {
+        name: qs('#f-name', modal).value.trim(),
+        level: qs('#f-level', modal).value ? Number(qs('#f-level', modal).value) : null,
+        email: qs('#f-email', modal).value.trim() || null,
+        phone: qs('#f-phone', modal).value.trim() || null,
+        birthdate: qs('#f-birth', modal).value || null,
+        sexo: qs('#f-sexo', modal).value || null,
+        interested_product: qs('#f-product', modal).value.trim() || null,
+        available_days: qs('#f-days', modal).value.split(',').map((s) => s.trim()).filter(Boolean),
+        morose: qs('#f-morose', modal).checked,
+        status: qs('#f-baja', modal).checked ? 'baja' : 'activo',
+        club_id: club.id,
+      };
+      if (!payload.name) return toast('El nombre es obligatorio.', true);
+      const { error } = student
+        ? await supabase.from('students').update(payload).eq('id', student.id)
+        : await supabase.from('students').insert(payload);
+      if (error) return toast(error.message, true);
+      modal.remove(); toast('Alumno guardado.');
+      students = await fetchStudentsView(club.id);
+      renderSummary(); renderTable();
+    };
+  }
+
+  async function importCsv(file) {
+    if (!file) return;
+    const text = await file.text();
+    const [headerLine, ...lines] = text.split(/\r?\n/).filter(Boolean);
+    const headers = headerLine.split(',').map((h) => h.trim().toLowerCase());
+    const rows = lines.map((line) => {
+      const cells = line.split(',');
+      const obj = {};
+      headers.forEach((h, i) => (obj[h] = cells[i]?.trim()));
+      return {
+        name: obj.name || obj.nombre,
+        email: obj.email || null,
+        phone: obj.phone || obj.telefono || null,
+        level: obj.level || obj.nivel ? Number(obj.level || obj.nivel) : null,
+        birthdate: obj.birthdate || obj.fecha_nacimiento || null,
+        interested_product: obj.interested_product || obj.producto || null,
+        club_id: club.id,
+        status: 'activo',
+      };
+    }).filter((r) => r.name);
+    if (!rows.length) return toast('No se han encontrado filas válidas en el CSV.', true);
+    const { error } = await supabase.from('students').insert(rows);
+    if (error) return toast(error.message, true);
+    toast(`${rows.length} alumnos importados a lista de espera.`);
+    students = await fetchStudentsView(club.id);
+    renderSummary(); renderTable();
+  }
+
+  function openMassEmail(allStudents) {
+    const modal = openModal('Email masivo', `
+      <div class="field"><label>Plantilla (opcional)</label><select id="me-template"><option value="">Texto libre</option>${state.emailTemplates.map((t) => `<option value="${t.id}">${esc(t.name)}</option>`).join('')}</select></div>
+      <div class="field"><label>Asunto</label><input id="me-subject" /></div>
+      <div class="field"><label>Cuerpo (admite {{nombre}} y {{club}})</label><textarea id="me-body" rows="6"></textarea></div>
+      <div class="field"><label>Destinatarios</label>
+        <div style="max-height:160px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:6px">
+          <label style="font-weight:400"><input type="checkbox" id="me-all" style="width:auto" checked /> Todos los que tienen email (${allStudents.filter(s=>s.email).length})</label>
+          ${allStudents.filter((s) => s.email).map((s) => `<label style="font-weight:400;display:block"><input type="checkbox" class="me-student" style="width:auto" value="${s.id}" checked /> ${esc(s.name)}</label>`).join('')}
+        </div>
+      </div>
+      <button class="btn" id="me-send" style="width:100%">Enviar</button>
+    `, { wide: true });
+
+    qs('#me-template', modal).onchange = (e) => {
+      const t = state.emailTemplates.find((x) => x.id === e.target.value);
+      qs('#me-subject', modal).value = t?.subject || '';
+      qs('#me-body', modal).value = t?.body || '';
+    };
+    qs('#me-all', modal).onchange = (e) => qsa('.me-student', modal).forEach((cb) => cb.checked = e.target.checked);
+
+    qs('#me-send', modal).onclick = async () => {
+      const subject = qs('#me-subject', modal).value.trim();
+      const body = qs('#me-body', modal).value;
+      const selectedIds = qsa('.me-student:checked', modal).map((cb) => cb.value);
+      const recipients = allStudents.filter((s) => selectedIds.includes(s.id));
+      if (!subject || !body || !recipients.length) return toast('Faltan asunto, cuerpo o destinatarios.', true);
+      qs('#me-send', modal).disabled = true;
+      qs('#me-send', modal).textContent = 'Enviando…';
+      try {
+        for (const r of recipients) {
+          await sendEmail({ to: r.email, subject: fillTemplate(subject, { nombre: r.name, club: club.name }), html: fillTemplate(body, { nombre: r.name, club: club.name }).replace(/\n/g, '<br/>') });
+        }
+        toast(`Enviado a ${recipients.length} alumnos.`);
+        modal.remove();
+      } catch (err) {
+        toast(err.message, true);
+        qs('#me-send', modal).disabled = false;
+        qs('#me-send', modal).textContent = 'Enviar';
+      }
+    };
+  }
+};
+
+async function computeAttendancePct(studentIds) {
+  if (!studentIds.length) return {};
+  const monthStart = new Date(); monthStart.setDate(1);
+  const { data } = await supabase.from('attendance').select('student_id, present').in('student_id', studentIds).gte('class_date', monthStart.toISOString().slice(0, 10));
+  const byStudent = {};
+  (data || []).forEach((r) => { (byStudent[r.student_id] ??= []).push(r.present); });
+  const pct = {};
+  Object.entries(byStudent).forEach(([id, arr]) => { pct[id] = Math.round((arr.filter(Boolean).length / arr.length) * 100); });
+  return pct;
+}
+
+// ---------- ACADEMIA: GRUPOS ----------
+// Organización interna de nivel/franja ANTES de que exista la clase real:
+// crear o mover alumnos aquí NUNCA toca la tabla `classes`.
+const GRUPO_MIN_SIZE = 3;
+// Orden de prioridad para proponer candidatos a una plaza libre de un grupo
+// (configurable: cambia el orden del array para cambiar el criterio).
+const GRUPO_PRIORITY = ['nivel', 'disponibilidad', 'sexo', 'edad'];
+
+MODULES.grupos = async (content) => {
+  const club = currentClub();
+  content.innerHTML = `
+    <div class="content-header"><h1>Grupos — ${esc(club.name)}</h1>
+      <button class="btn secondary" id="auto-groups">Autoformar grupos sugeridos</button>
+      <button class="btn" id="new-group">+ Grupo</button>
+    </div>
+    <div id="groups-body"><p class="muted">Cargando…</p></div>
+  `;
+  let grupos, students;
+  await load();
+
+  qs('#new-group').onclick = () => openGroupForm();
+  qs('#auto-groups').onclick = () => autoFormGroups();
+
+  async function load() {
+    const [{ data: g }, s] = await Promise.all([
+      supabase.from('academia_grupos').select('*, trainers(name)').eq('club_id', club.id),
+      fetchStudentsView(club.id),
+    ]);
+    grupos = g || [];
+    students = s.filter((x) => x.status !== 'baja');
+    renderGroups();
+  }
+
+  function renderGroups() {
+    const unassigned = students.filter((s) => !s.academia_grupo_id);
+    qs('#groups-body').innerHTML = `
+      <div class="muted" style="margin-bottom:10px">${unassigned.length} alumnos sin grupo interno todavía.</div>
+      ${grupos.map((g) => {
+        const members = students.filter((s) => s.academia_grupo_id === g.id);
+        const candidates = members.length < g.capacidad ? scoreCandidates(g, unassigned).slice(0, 5) : [];
+        return `<div class="card" style="margin-bottom:10px">
+          <div class="content-header" style="margin-bottom:6px">
+            <h3>${DIAS_LABEL[g.dia] || g.dia} · ${esc(g.franja)} · nivel ${g.nivel ?? '-'} ${g.trainers ? '· ' + esc(g.trainers.name) : ''}</h3>
+            <span class="muted">${members.length}/${g.capacidad}</span>
+          </div>
+          ${g.descripcion ? `<p class="muted">${esc(g.descripcion)}</p>` : ''}
+          <div>${members.map((s) => `<span class="pill activo" style="margin:2px">${esc(s.name)} <a href="#" data-remove="${s.id}" data-group="${g.id}" style="color:inherit">&times;</a></span>`).join('') || '<span class="muted">Sin alumnos.</span>'}</div>
+          ${candidates.length ? `<div class="tip">Candidatos sugeridos para la plaza libre: ${candidates.map((c) => `<a href="#" data-assign="${c.student.id}" data-group="${g.id}">${esc(c.student.name)}</a>`).join(', ')}</div>` : ''}
+        </div>`;
+      }).join('') || '<p class="muted">No hay grupos creados.</p>'}
+    `;
+    qsa('[data-remove]', qs('#groups-body')).forEach((a) => a.onclick = async (e) => { e.preventDefault(); await assignToGroup(a.dataset.remove, null); });
+    qsa('[data-assign]', qs('#groups-body')).forEach((a) => a.onclick = async (e) => { e.preventDefault(); await assignToGroup(a.dataset.assign, a.dataset.group); });
+  }
+
+  async function assignToGroup(studentId, groupId) {
+    const { error } = await supabase.from('students').update({ academia_grupo_id: groupId }).eq('id', studentId);
+    if (error) return toast(error.message, true);
+    await load();
+  }
+
+  function openGroupForm() {
+    const modal = openModal('Nuevo grupo', `
+      <div class="row">
+        <div class="field"><label>Día</label><select id="g-dia">${DIAS.map((d) => `<option value="${d}">${DIAS_LABEL[d]}</option>`).join('')}</select></div>
+        <div class="field"><label>Franja</label><input id="g-franja" placeholder="17:00-18:00" /></div>
+      </div>
+      <div class="row">
+        <div class="field"><label>Nivel</label><input type="number" step="0.1" id="g-nivel" /></div>
+        <div class="field"><label>Capacidad</label><input type="number" id="g-cap" value="4" /></div>
+      </div>
+      <div class="field"><label>Entrenador (opcional)</label><select id="g-trainer"><option value="">-</option>${state.trainers.filter(t=>t.clubs.includes(club.id)).map((t) => `<option value="${t.id}">${esc(t.name)}</option>`).join('')}</select></div>
+      <div class="field"><label>Descripción</label><textarea id="g-desc" rows="2"></textarea></div>
+      <button class="btn" id="g-save" style="width:100%">Crear</button>
+    `);
+    qs('#g-save', modal).onclick = async () => {
+      const payload = {
+        club_id: club.id, dia: qs('#g-dia', modal).value, franja: qs('#g-franja', modal).value.trim(),
+        nivel: qs('#g-nivel', modal).value ? Number(qs('#g-nivel', modal).value) : null,
+        capacidad: Number(qs('#g-cap', modal).value) || 4,
+        trainer_id: qs('#g-trainer', modal).value || null,
+        descripcion: qs('#g-desc', modal).value.trim() || null,
+      };
+      if (!payload.franja) return toast('La franja horaria es obligatoria.', true);
+      const { error } = await supabase.from('academia_grupos').insert(payload);
+      if (error) return toast(error.message, true);
+      modal.remove(); toast('Grupo creado.'); await load();
+    };
+  }
+
+  async function autoFormGroups() {
+    const unassigned = students.filter((s) => !s.academia_grupo_id);
+    const buckets = {};
+    unassigned.forEach((s) => {
+      const days = s.available_days?.length ? s.available_days : ['sin_dia'];
+      const levelBucket = s.level != null ? Math.round(s.level) : 'sin_nivel';
+      const bracket = ageBracket(s.birthdate) || 'sin_edad';
+      days.forEach((d) => {
+        const key = `${d}|${levelBucket}|${bracket}`;
+        (buckets[key] ??= []).push(s);
+      });
+    });
+    const proposals = Object.entries(buckets)
+      .filter(([, arr]) => arr.length >= GRUPO_MIN_SIZE)
+      .map(([key, arr]) => { const [dia, nivel, bracket] = key.split('|'); return { dia, nivel, bracket, students: arr }; });
+
+    if (!proposals.length) return toast('No hay suficientes alumnos compatibles para proponer un grupo nuevo (mínimo ' + GRUPO_MIN_SIZE + ').', true);
+
+    const modal = openModal('Grupos sugeridos', `
+      ${proposals.map((p, i) => `<div class="card" style="margin-bottom:8px">
+        <label style="font-weight:400"><input type="checkbox" class="prop-check" data-i="${i}" style="width:auto" checked />
+        ${p.dia !== 'sin_dia' ? DIAS_LABEL[p.dia] : 'Sin día preferido'} · nivel ~${p.nivel} · ${p.bracket} — ${p.students.length} alumnos: ${p.students.map((s) => esc(s.name)).join(', ')}</label>
+      </div>`).join('')}
+      <button class="btn" id="confirm-groups" style="width:100%">Crear grupos seleccionados</button>
+    `, { wide: true });
+
+    qs('#confirm-groups', modal).onclick = async () => {
+      const chosen = qsa('.prop-check:checked', modal).map((cb) => proposals[Number(cb.dataset.i)]);
+      for (const p of chosen) {
+        const { data: newGroup, error } = await supabase.from('academia_grupos').insert({
+          club_id: club.id, dia: p.dia === 'sin_dia' ? DIAS[0] : p.dia, franja: 'por definir',
+          nivel: p.nivel === 'sin_nivel' ? null : Number(p.nivel), capacidad: Math.max(p.students.length, GRUPO_MIN_SIZE),
+          descripcion: 'Grupo autoformado por nivel/disponibilidad',
+        }).select().single();
+        if (error) { toast(error.message, true); continue; }
+        await supabase.from('students').update({ academia_grupo_id: newGroup.id }).in('id', p.students.map((s) => s.id));
+      }
+      modal.remove(); toast('Grupos creados.'); await load();
+    };
+  }
+};
+
+function scoreCandidates(grupo, candidates) {
+  // Puntúa por lista de prioridades configurable en vez de un filtro rígido
+  // todo-o-nada: cada criterio suma peso decreciente según su posición.
+  return candidates.map((s) => {
+    let score = 0;
+    GRUPO_PRIORITY.forEach((crit, idx) => {
+      const weight = (GRUPO_PRIORITY.length - idx) * 10;
+      if (crit === 'nivel' && grupo.nivel != null && s.level != null) {
+        score += Math.max(0, weight - Math.abs(grupo.nivel - s.level) * weight);
+      } else if (crit === 'disponibilidad' && s.available_days?.includes(grupo.dia)) {
+        score += weight;
+      } else if (crit === 'sexo' && grupo.majoritySexo && s.sexo === grupo.majoritySexo) {
+        score += weight;
+      } else if (crit === 'edad' && grupo.ageBracket && ageBracket(s.birthdate) === grupo.ageBracket) {
+        score += weight;
+      }
+    });
+    return { student: s, score };
+  }).sort((a, b) => b.score - a.score);
+}
+
+// ---------- ACADEMIA: PLANIFICACIÓN ----------
+MODULES.planificacion = async (content) => {
+  const club = currentClub();
+  content.innerHTML = `
+    <div class="content-header"><h1>Planificación — ${esc(club.name)}</h1>
+      <div>
+        <input type="file" id="bulk-input" multiple class="hidden" />
+        <button class="btn secondary" id="bulk-btn">Subir varias semanas</button>
+        <button class="btn" id="new-week-btn">+ Semana</button>
+      </div>
+    </div>
+    <div class="tip">El número de sesión al subir varias semanas de golpe se detecta del nombre del archivo (ej. "semana-05.pdf" → sesión 5).</div>
+    <div id="weeks-body"><p class="muted">Cargando…</p></div>
+  `;
+  let weeks = [];
+  await load();
+
+  qs('#new-week-btn').onclick = () => openWeekForm();
+  qs('#bulk-btn').onclick = () => qs('#bulk-input').click();
+  qs('#bulk-input').onchange = (e) => bulkUpload([...e.target.files]);
+
+  async function load() {
+    const { data } = await supabase.from('planning_weeks').select('*').eq('club_id', club.id).order('session_number');
+    weeks = data || [];
+    render();
+  }
+
+  function render() {
+    qs('#weeks-body').innerHTML = weeks.length ? weeks.map((w) => `
+      <div class="card" style="margin-bottom:8px">
+        <div class="content-header" style="margin-bottom:4px">
+          <h3>Sesión ${w.session_number}${w.title ? ' · ' + esc(w.title) : ''}</h3>
+          <button class="btn small secondary edit-week" data-id="${w.id}">Editar</button>
+        </div>
+        <p>${esc(w.content || '')}</p>
+        ${w.attachment_url ? `<a href="${w.attachment_url}" target="_blank">📎 ${esc(w.attachment_name || 'adjunto')}</a>` : ''}
+      </div>`).join('') : '<p class="muted">Sin semanas planificadas todavía.</p>';
+    qsa('.edit-week', qs('#weeks-body')).forEach((b) => b.onclick = () => openWeekForm(weeks.find((w) => w.id === b.dataset.id)));
+  }
+
+  function openWeekForm(week) {
+    const modal = openModal(week ? 'Editar semana' : 'Nueva semana', `
+      <div class="row">
+        <div class="field"><label>Nº de sesión</label><input type="number" id="w-num" value="${week?.session_number ?? weeks.length + 1}" /></div>
+        <div class="field"><label>Título (opcional)</label><input id="w-title" value="${esc(week?.title || '')}" /></div>
+      </div>
+      <div class="field"><label>Qué se trabaja esta semana</label><textarea id="w-content" rows="4">${esc(week?.content || '')}</textarea></div>
+      <div class="field"><label>Adjunto</label><input type="file" id="w-file" /></div>
+      <button class="btn" id="w-save" style="width:100%">Guardar</button>
+    `);
+    qs('#w-save', modal).onclick = async () => {
+      let attachment_url = week?.attachment_url || null, attachment_name = week?.attachment_name || null;
+      const file = qs('#w-file', modal).files[0];
+      if (file) { const up = await uploadAttachment(file); attachment_url = up.url; attachment_name = up.name; }
+      const payload = {
+        club_id: club.id, session_number: Number(qs('#w-num', modal).value),
+        title: qs('#w-title', modal).value.trim() || null,
+        content: qs('#w-content', modal).value.trim() || null,
+        attachment_url, attachment_name,
+      };
+      const { error } = week
+        ? await supabase.from('planning_weeks').update(payload).eq('id', week.id)
+        : await supabase.from('planning_weeks').upsert(payload, { onConflict: 'club_id,session_number' });
+      if (error) return toast(error.message, true);
+      modal.remove(); toast('Semana guardada.'); await load();
+    };
+  }
+
+  async function bulkUpload(files) {
+    for (const file of files) {
+      const match = file.name.match(/(\d+)/);
+      if (!match) { toast(`No se detecta número de sesión en "${file.name}", se omite.`, true); continue; }
+      const sessionNumber = Number(match[1]);
+      const up = await uploadAttachment(file);
+      const { error } = await supabase.from('planning_weeks').upsert({
+        club_id: club.id, session_number: sessionNumber, attachment_url: up.url, attachment_name: up.name,
+      }, { onConflict: 'club_id,session_number' });
+      if (error) toast(`${file.name}: ${error.message}`, true);
+    }
+    toast('Subida completada.');
+    await load();
+  }
+};
+
+// ---------- ACADEMIA: KPIS ----------
+MODULES.kpis = async (content) => {
+  const club = currentClub();
+  let cursor = new Date(); cursor.setDate(1);
+
+  content.innerHTML = `
+    <div class="content-header"><h1>KPIs — ${esc(club.name)}</h1></div>
+    <div class="kpi-row" id="kpi-cards"></div>
+    <div class="content-header">
+      <h2 id="kpi-month-label"></h2>
+      <div><button class="btn small secondary" id="kpi-prev">&larr;</button> <button class="btn small secondary" id="kpi-next">&rarr;</button> <button class="btn small" id="kpi-freeze">Congelar este mes</button></div>
+    </div>
+    <div id="kpi-note" class="tip"></div>
+    <div id="kpi-table"></div>
+  `;
+  qs('#kpi-prev').onclick = () => { cursor.setMonth(cursor.getMonth() - 1); renderMonth(); };
+  qs('#kpi-next').onclick = () => { cursor.setMonth(cursor.getMonth() + 1); renderMonth(); };
+  qs('#kpi-freeze').onclick = () => freezeMonth();
+
+  const students = await fetchStudentsView(club.id);
+  const { data: classes } = await supabase.from('classes').select('*, class_students(student_id)').eq('club_id', club.id);
+  const clubTrainers = state.trainers.filter((t) => t.clubs.includes(club.id));
+
+  renderCards();
+  let monthData = null;
+  await renderMonth();
+
+  function renderCards() {
+    const activos = students.filter((s) => s.computed_status === 'activo');
+    const groupsSizes = {};
+    (classes || []).forEach((c) => { const n = (c.class_students || []).length; if (n > 0) (groupsSizes[c.id] = n); });
+    const sizes = Object.values(groupsSizes);
+    const avgGroupSize = sizes.length ? (sizes.reduce((a, b) => a + b, 0) / sizes.length).toFixed(1) : '-';
+    qs('#kpi-cards').innerHTML = `
+      <div class="kpi-card"><div class="num">${activos.length}</div><div class="label">Alumnos activos</div></div>
+      <div class="kpi-card"><div class="num">${avgGroupSize}</div><div class="label">Tamaño medio de grupo</div></div>
+      <div class="kpi-card"><div class="num">${(classes || []).length}</div><div class="label">Clases/semana en Parrilla</div></div>
+      <div class="kpi-card"><div class="num">${students.filter((s) => s.morose).length}</div><div class="label">Pagos pendientes</div></div>
+      <div class="kpi-card"><div class="num">${clubTrainers.length}</div><div class="label">Entrenadores en el club</div></div>
+    `;
+  }
+
+  async function renderMonth() {
+    const monthKey = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}`;
+    qs('#kpi-month-label').textContent = cursor.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+
+    // Snapshot congelado tiene prioridad si existe para este mes.
+    const { data: frozen } = await supabase.from('monthly_stats').select('*').eq('month_key', monthKey).in('trainer_id', clubTrainers.map((t) => t.id));
+    if (frozen && frozen.length) {
+      monthData = { source: frozen[0].source, byTrainer: Object.fromEntries(frozen.map((f) => [f.trainer_id, f.breakdown])) };
+      qs('#kpi-note').textContent = `Datos ${frozen[0].source === 'real' ? 'reales (congelados)' : 'estimados (congelados)'} para ${monthKey}. No cambiarán aunque se modifique el horario después.`;
+      renderTable(monthKey);
+      return;
+    }
+
+    // Intentamos traer reservas reales de Playtomic para este mes; si la
+    // integración no está configurada/disponible, se estima desde la Parrilla.
+    let bookings = null;
+    try {
+      const from = `${monthKey}-01`;
+      const toDate = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0);
+      bookings = await fetchPlaytomicBookings(from, toDate.toISOString().slice(0, 10));
+    } catch (err) {
+      console.warn('Playtomic no disponible, se estima desde el horario interno:', err.message);
+    }
+
+    if (bookings && bookings.length) {
+      const byTrainer = {};
+      clubTrainers.forEach((t) => {
+        const mine = bookings.filter((b) => b.trainer_name && t.external_system_name && b.trainer_name.trim().toLowerCase() === t.external_system_name.trim().toLowerCase());
+        byTrainer[t.id] = { total: mine.length };
+      });
+      monthData = { source: 'real', byTrainer };
+      qs('#kpi-note').textContent = 'Datos REALES (reservas casadas por nombre de entrenador desde Playtomic).';
+    } else {
+      const daysInMonth = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0).getDate();
+      const byTrainer = {};
+      clubTrainers.forEach((t) => {
+        const weeklyClasses = (classes || []).filter((c) => c.trainer_id === t.id);
+        const byType = {};
+        weeklyClasses.forEach((c) => {
+          const occurrences = Math.floor(daysInMonth / 7);
+          byType[c.type] = (byType[c.type] || 0) + occurrences;
+        });
+        byTrainer[t.id] = byType;
+      });
+      monthData = { source: 'estimado', byTrainer };
+      qs('#kpi-note').textContent = 'Datos ESTIMADOS a partir del horario interno configurado (sin integración de reservas reales disponible para este mes).';
+    }
+    renderTable(monthKey);
+  }
+
+  function renderTable(monthKey) {
+    const allTypes = [...new Set((classes || []).map((c) => c.type))];
+    qs('#kpi-table').innerHTML = `<table><thead><tr><th>Entrenador</th>${monthData.source === 'real' ? '<th>Total reservas reales</th>' : allTypes.map((t) => `<th>${esc(t)}</th>`).join('')}<th>Total</th></tr></thead>
+      <tbody>${clubTrainers.map((t) => {
+        const row = monthData.byTrainer[t.id] || {};
+        if (monthData.source === 'real') {
+          return `<tr><td>${esc(t.name)}</td><td>${row.total || 0}</td><td>${row.total || 0}</td></tr>`;
+        }
+        const total = Object.values(row).reduce((a, b) => a + b, 0);
+        return `<tr><td>${esc(t.name)}</td>${allTypes.map((ty) => `<td>${row[ty] || 0}</td>`).join('')}<td>${total}</td></tr>`;
+      }).join('')}</tbody></table>`;
+  }
+
+  async function freezeMonth() {
+    const monthKey = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}`;
+    if (!confirm(`¿Congelar los datos de ${monthKey}? Quedarán fijos aunque cambie el horario después.`)) return;
+    for (const t of clubTrainers) {
+      const breakdown = monthData.byTrainer[t.id] || {};
+      const total = monthData.source === 'real' ? (breakdown.total || 0) : Object.values(breakdown).reduce((a, b) => a + b, 0);
+      await supabase.from('monthly_stats').upsert({
+        trainer_id: t.id, month_key: monthKey, breakdown, total_classes: total, source: monthData.source,
+      }, { onConflict: 'trainer_id,month_key' });
+    }
+    toast('Mes congelado.');
+    await renderMonth();
+  }
+};
+
+// ---------- ENTRENADOR: ENTRENADORES ----------
+MODULES.entrenadores = async (content) => {
+  content.innerHTML = `<div class="content-header"><h1>Entrenadores</h1><button class="btn" id="new-trainer">+ Entrenador/a</button></div><div id="trainers-body"></div>`;
+  qs('#new-trainer').onclick = () => openTrainerForm();
+  render();
+
+  function render() {
+    qs('#trainers-body').innerHTML = `<table><thead><tr><th>Nombre</th><th>Contacto</th><th>Clubs</th><th>PIN</th><th>Color</th><th>Nombre en Playtomic</th><th></th></tr></thead>
+      <tbody>${state.trainers.map((t) => `<tr>
+        <td>${esc(t.name)}</td>
+        <td>${esc(t.email || '')}<br/>${esc(t.phone || '')}</td>
+        <td>${t.clubs.map((cid) => esc(state.clubs.find((c) => c.id === cid)?.name || '')).join(', ')}</td>
+        <td>••••</td>
+        <td><span style="display:inline-block;width:14px;height:14px;border-radius:3px;background:${t.color}"></span></td>
+        <td>${esc(t.external_system_name || '-')}</td>
+        <td><button class="btn small secondary edit-trainer" data-id="${t.id}">Editar</button></td>
+      </tr>`).join('') || '<tr><td colspan="7" class="muted">Sin entrenadores dados de alta.</td></tr>'}</tbody></table>`;
+    qsa('.edit-trainer', qs('#trainers-body')).forEach((b) => b.onclick = () => openTrainerForm(state.trainers.find((t) => t.id === b.dataset.id)));
+  }
+
+  function openTrainerForm(trainer) {
+    const modal = openModal(trainer ? 'Editar entrenador/a' : 'Nuevo/a entrenador/a', `
+      <div class="row">
+        <div class="field"><label>Nombre</label><input id="t-name" value="${esc(trainer?.name || '')}" /></div>
+        <div class="field"><label>PIN (acceso Vista entrenador)</label><input id="t-pin" value="${esc(trainer?.pin || '')}" /></div>
+      </div>
+      <div class="row">
+        <div class="field"><label>Email</label><input type="email" id="t-email" value="${esc(trainer?.email || '')}" /></div>
+        <div class="field"><label>Teléfono</label><input id="t-phone" value="${esc(trainer?.phone || '')}" /></div>
+      </div>
+      <div class="row">
+        <div class="field"><label>Color en la Parrilla</label><input type="color" id="t-color" value="${trainer?.color || '#2f6f4f'}" /></div>
+        <div class="field"><label>Nombre exacto en Playtomic (para casar KPIs)</label><input id="t-ext" value="${esc(trainer?.external_system_name || '')}" /></div>
+      </div>
+      <div class="field"><label>Clubs donde trabaja</label>
+        ${state.clubs.map((c) => `<label style="font-weight:400"><input type="checkbox" class="t-club" value="${c.id}" style="width:auto" ${trainer?.clubs?.includes(c.id)?'checked':''}/> ${esc(c.name)}</label>`).join('<br/>')}
+      </div>
+      <div class="field"><label>Disponibilidad (por día, formato HH:MM-HH:MM, vacío = sin restricción)</label>
+        ${DIAS.map((d) => `<div class="row"><div style="flex:0 0 90px">${DIAS_LABEL[d]}</div><input class="t-avail" data-day="${d}" placeholder="16:00-21:00" value="${(trainer?.availability?.[d]||[]).map(r=>r.join('-')).join(',')}"/></div>`).join('')}
+      </div>
+      <button class="btn" id="t-save" style="width:100%">Guardar</button>
+    `, { wide: true });
+
+    qs('#t-save', modal).onclick = async () => {
+      const availability = {};
+      qsa('.t-avail', modal).forEach((inp) => {
+        if (!inp.value.trim()) return;
+        availability[inp.dataset.day] = inp.value.split(',').map((r) => r.trim().split('-'));
+      });
+      const payload = {
+        name: qs('#t-name', modal).value.trim(),
+        pin: qs('#t-pin', modal).value.trim(),
+        email: qs('#t-email', modal).value.trim() || null,
+        phone: qs('#t-phone', modal).value.trim() || null,
+        color: qs('#t-color', modal).value,
+        external_system_name: qs('#t-ext', modal).value.trim() || null,
+        clubs: qsa('.t-club:checked', modal).map((cb) => cb.value),
+        availability,
+      };
+      if (!payload.name || !payload.pin) return toast('Nombre y PIN son obligatorios.', true);
+      const { error } = trainer
+        ? await supabase.from('trainers').update(payload).eq('id', trainer.id)
+        : await supabase.from('trainers').insert(payload);
+      if (error) return toast(error.message, true);
+      modal.remove(); toast('Entrenador/a guardado/a.');
+      const { data } = await supabase.from('trainers').select('*').order('name');
+      state.trainers = data || [];
+      render();
+    };
+  }
+};
+
+// ---------- ENTRENADOR: ALUMNOS (NIVELACIÓN CRUZADA) ----------
+MODULES.nivelacion = async (content) => {
+  content.innerHTML = `<div class="content-header"><h1>Alumnos — nivelación cruzada</h1></div>
+    <p class="muted">Todos los alumnos activos de todos los clubs a los que tienes acceso, para nivelar de golpe.</p>
+    <div id="nivel-body"><p class="muted">Cargando…</p></div>`;
+  const accessibleClubs = state.profile.role === 'admin' ? state.clubs : state.clubs.filter((c) => state.profile.club_ids.includes(c.id));
+  const all = (await Promise.all(accessibleClubs.map((c) => fetchStudentsView(c.id)))).flat().filter((s) => s.computed_status === 'activo');
+
+  qs('#nivel-body').innerHTML = `<table><thead><tr><th>Alumno</th><th>Club</th><th>Nivel</th></tr></thead>
+    <tbody>${all.map((s) => `<tr><td>${esc(s.name)}</td><td>${esc(accessibleClubs.find((c) => c.id === s.club_id)?.name || '')}</td>
+      <td><input type="number" step="0.1" class="level-input" data-id="${s.id}" value="${s.level ?? ''}" style="width:80px" /></td></tr>`).join('')}</tbody></table>`;
+
+  qsa('.level-input', qs('#nivel-body')).forEach((inp) => inp.onchange = async () => {
+    const { error } = await supabase.from('students').update({ level: inp.value ? Number(inp.value) : null }).eq('id', inp.dataset.id);
+    if (error) toast(error.message, true); else toast('Nivel actualizado.');
+  });
+};
+
+// ---------- VISTA ENTRENADOR (acceso por PIN, móvil) ----------
+async function bootstrapTrainerView() {
+  const ts = state.trainerSession;
+  qs('#tv-trainer-name').textContent = ts.name;
+  qs('#trainer-view').classList.add('active');
+  await renderTrainerDashboardInto(qs('#tv-content'), {
+    fetchDashboard: () => supabase.rpc('rpc_trainer_dashboard', { p_trainer_id: ts.id, p_pin: ts.pin }),
+    markAttendance: (classId, studentId, date, present) => supabase.rpc('rpc_trainer_mark_attendance', { p_trainer_id: ts.id, p_pin: ts.pin, p_class_id: classId, p_student_id: studentId, p_class_date: date, p_present: present }),
+    updateFlag: (studentId, field, value) => supabase.rpc('rpc_trainer_update_student_flag', { p_trainer_id: ts.id, p_pin: ts.pin, p_student_id: studentId, p_field: field, p_value: value }),
+    reportIncident: (description, section, urgency) => supabase.rpc('rpc_trainer_report_incident', { p_trainer_id: ts.id, p_pin: ts.pin, p_description: description, p_target_section: section, p_urgency: urgency }),
+  });
+}
+
+// ---------- ENTRENADOR: "MI VISTA" (cuenta real con role='entrenador') ----------
+MODULES.mivista = async (content) => {
+  content.innerHTML = `<h1>Mi vista</h1><div id="mivista-content"></div>`;
+  await renderTrainerDashboardInto(qs('#mivista-content'), {
+    fetchDashboard: () => supabase.rpc('rpc_my_trainer_dashboard'),
+    markAttendance: (classId, studentId, date, present) => supabase.rpc('rpc_my_trainer_mark_attendance', { p_class_id: classId, p_student_id: studentId, p_class_date: date, p_present: present }),
+    updateFlag: (studentId, field, value) => supabase.rpc('rpc_my_trainer_update_student_flag', { p_student_id: studentId, p_field: field, p_value: value }),
+    reportIncident: (description, section, urgency) => supabase.rpc('rpc_my_trainer_report_incident', { p_description: description, p_target_section: section, p_urgency: urgency }),
+  });
+};
+
+// Dashboard de "lo mío" compartido entre la Vista entrenador por PIN y la
+// pantalla "Mi vista" de cuentas con role='entrenador'; solo cambia cómo
+// se llama al backend (RPCs por PIN vs. RPCs por auth.uid()).
+async function renderTrainerDashboardInto(box, rpc) {
+  box.innerHTML = '<p class="muted">Cargando…</p>';
+  const { data, error } = await rpc.fetchDashboard();
+  if (error) { box.innerHTML = `<div class="warn">${esc(error.message)}</div>`; return; }
+
+  const today = DIAS[(new Date().getDay() + 6) % 7]; // getDay(): 0=domingo
+  const todays = data.classes.filter((c) => c.day === today);
+
+  box.innerHTML = `
+    <div class="tabs" id="tv-tabs"><button class="active" data-v="hoy">Hoy</button><button data-v="semana">Semana</button><button data-v="plan">Planificación</button><button data-v="incidencia">Reportar incidencia</button></div>
+    <div id="tv-body"></div>
+  `;
+  qsa('#tv-tabs button', box).forEach((b) => b.onclick = () => { qsa('#tv-tabs button', box).forEach(x=>x.classList.remove('active')); b.classList.add('active'); renderTab(b.dataset.v); });
+  renderTab('hoy');
+
+  function classCard(c) {
+    return `<div class="class-card">
+      <h3>${DIAS_LABEL[c.day]} ${c.hour} · ${esc(c.type)} · pista ${c.court ?? '?'}</h3>
+      ${c.students.map((s) => `<div class="student-row">
+        <span>${esc(s.name)}</span>
+        <label><input type="checkbox" class="tv-present" data-class="${c.id}" data-student="${s.id}" /> Asistió</label>
+      </div>
+      <div class="student-row">
+        <label><input type="checkbox" class="tv-wp" data-student="${s.id}" ${s.welcome_pack_received?'checked':''} /> Welcome pack</label>
+        <label><input type="checkbox" class="tv-morose" data-student="${s.id}" ${s.morose?'checked':''} /> Pago pendiente</label>
+      </div>`).join('') || '<p class="muted">Sin alumnos asignados.</p>'}
+    </div>`;
+  }
+
+  function renderTab(view) {
+    const tvBody = qs('#tv-body', box);
+    if (view === 'hoy') {
+      tvBody.innerHTML = todays.map(classCard).join('') || '<p class="muted">No tienes clases hoy.</p>';
+    } else if (view === 'semana') {
+      tvBody.innerHTML = data.classes.map(classCard).join('') || '<p class="muted">No tienes clases asignadas.</p>';
+    } else if (view === 'plan') {
+      tvBody.innerHTML = data.planning.map((p) => `<div class="class-card"><h3>Sesión ${p.session_number}${p.title ? ' · ' + esc(p.title) : ''}</h3><p>${esc(p.content || '')}</p>${p.attachment_url ? `<a href="${p.attachment_url}" target="_blank">📎 ${esc(p.attachment_name||'adjunto')}</a>` : ''}</div>`).join('') || '<p class="muted">Sin planificación disponible.</p>';
+    } else if (view === 'incidencia') {
+      tvBody.innerHTML = `<div class="class-card">
+        <div class="field"><label>Sección destino</label><input id="inc-section" placeholder="ej. mantenimiento, recepción…" /></div>
+        <div class="field"><label>Urgencia</label><select id="inc-urg">${URGENCIAS.map((u) => `<option value="${u}">${URGENCIA_LABEL[u]}</option>`).join('')}</select></div>
+        <div class="field"><label>Descripción</label><textarea id="inc-desc" rows="4"></textarea></div>
+        <button class="btn" id="inc-send" style="width:100%">Enviar incidencia</button>
+      </div>`;
+      qs('#inc-send', tvBody).onclick = async () => {
+        const { error } = await rpc.reportIncident(qs('#inc-desc', tvBody).value.trim(), qs('#inc-section', tvBody).value.trim(), qs('#inc-urg', tvBody).value);
+        if (error) return toast(error.message, true);
+        toast('Incidencia reportada.'); qs('#inc-desc', tvBody).value = '';
+      };
+    }
+    qsa('.tv-present', tvBody).forEach((cb) => cb.onchange = async () => {
+      const { error } = await rpc.markAttendance(cb.dataset.class, cb.dataset.student, todayISO(), cb.checked);
+      if (error) toast(error.message, true);
+    });
+    qsa('.tv-wp', tvBody).forEach((cb) => cb.onchange = async () => {
+      const { error } = await rpc.updateFlag(cb.dataset.student, 'welcome_pack_received', cb.checked);
+      if (error) toast(error.message, true);
+    });
+    qsa('.tv-morose', tvBody).forEach((cb) => cb.onchange = async () => {
+      const { error } = await rpc.updateFlag(cb.dataset.student, 'morose', cb.checked);
+      if (error) toast(error.message, true);
+    });
+  }
+}
+
+// ---------- EVENTOS (siempre global, todos los clubs) ----------
+MODULES.eventos = async (content) => {
+  content.innerHTML = `
+    <div class="content-header"><h1>Eventos — todos los clubs</h1>
+      <div><button class="btn secondary" id="ev-mass-email">Email masivo</button><button class="btn" id="ev-new">+ Evento</button></div>
+    </div>
+    <div class="tabs" id="ev-tabs"><button class="active" data-v="dia">Día</button><button data-v="semana">Semana</button><button data-v="mes">Mes</button><button data-v="anio">Año</button><button data-v="listado">Listado</button></div>
+    <div class="row" id="ev-filters">
+      <div class="field"><label>Club</label><select id="ev-f-club"><option value="">Todos</option>${state.clubs.map((c) => `<option value="${c.id}">${esc(c.name)}</option>`).join('')}</select></div>
+      <div class="field"><label>Categoría</label><select id="ev-f-cat"><option value="">Todas</option>${Object.keys(CATEGORIA_COLORS).map((c) => `<option value="${c}">${c}</option>`).join('')}</select></div>
+      <div class="field"><label>Estado</label><select id="ev-f-status"><option value="">Todos</option><option>tentativo</option><option>confirmado</option><option>cancelado</option></select></div>
+    </div>
+    <div id="ev-body"><p class="muted">Cargando…</p></div>
+  `;
+  let view = 'listado';
+  let events = [];
+  await load();
+
+  qsa('#ev-tabs button').forEach((b) => b.onclick = () => { view = b.dataset.v; qsa('#ev-tabs button').forEach(x=>x.classList.remove('active')); b.classList.add('active'); render(); });
+  qsa('#ev-filters select').forEach((s) => s.onchange = render);
+  qs('#ev-new').onclick = () => openEventForm();
+  qs('#ev-mass-email').onclick = () => openEventMassEmail(filtered());
+
+  async function load() {
+    const { data } = await supabase.from('events').select('*, clubs(name)').order('date');
+    events = data || [];
+    render();
+  }
+
+  function filtered() {
+    const club = qs('#ev-f-club').value, cat = qs('#ev-f-cat').value, status = qs('#ev-f-status').value;
+    return events.filter((e) => (!club || e.club_id === club) && (!cat || e.category === cat) && (!status || e.status === status));
+  }
+
+  function render() {
+    const list = filtered();
+    const body = qs('#ev-body');
+    if (view === 'listado') {
+      body.innerHTML = `<table><thead><tr><th>Fecha</th><th>Empresa</th><th>Club</th><th>Categoría</th><th>Pistas</th><th>Estado</th><th></th></tr></thead>
+        <tbody>${list.map(eventRow).join('') || '<tr><td colspan="7" class="muted">Sin eventos.</td></tr>'}</tbody></table>`;
+    } else if (view === 'dia') {
+      const day = list.filter((e) => e.date === todayISO());
+      body.innerHTML = day.length ? day.map(eventCard).join('') : '<p class="muted">No hay eventos hoy.</p>';
+    } else if (view === 'semana') {
+      const now = new Date(); const start = new Date(now); start.setDate(now.getDate() - now.getDay() + 1);
+      const end = new Date(start); end.setDate(start.getDate() + 6);
+      const week = list.filter((e) => e.date >= start.toISOString().slice(0,10) && e.date <= end.toISOString().slice(0,10));
+      body.innerHTML = week.length ? week.map(eventCard).join('') : '<p class="muted">Sin eventos esta semana.</p>';
+    } else if (view === 'mes') {
+      const now = new Date(); const monthKey = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+      const month = list.filter((e) => e.date.startsWith(monthKey));
+      const byDay = {};
+      month.forEach((e) => (byDay[e.date] ??= []).push(e));
+      body.innerHTML = Object.keys(byDay).sort().map((d) => `<div class="card" style="margin-bottom:8px"><h3>${fmtDate(d)}</h3>${byDay[d].map(eventCard).join('')}</div>`).join('') || '<p class="muted">Sin eventos este mes.</p>';
+    } else if (view === 'anio') {
+      const now = new Date();
+      const byMonth = Array(12).fill(0);
+      list.filter((e) => e.date.startsWith(String(now.getFullYear()))).forEach((e) => byMonth[Number(e.date.slice(5,7)) - 1]++);
+      body.innerHTML = `<div class="kpi-row">${byMonth.map((n, i) => `<div class="kpi-card"><div class="num">${n}</div><div class="label">${new Date(2000, i, 1).toLocaleDateString('es-ES', { month: 'short' })}</div></div>`).join('')}</div>`;
+    }
+    qsa('.ev-edit', body).forEach((b) => b.onclick = () => openEventForm(events.find((e) => e.id === b.dataset.id)));
+  }
+
+  function eventRow(e) {
+    return `<tr>
+      <td>${fmtDate(e.date)}${e.end_date && e.end_date !== e.date ? ' – ' + fmtDate(e.end_date) : ''}<br/><span class="muted">${e.start_hour}-${e.end_hour}</span></td>
+      <td class="ev-edit" data-id="${e.id}" style="cursor:pointer">${esc(e.company)}</td>
+      <td>${esc(e.clubs?.name || '')}</td>
+      <td><span class="pill" style="background:${CATEGORIA_COLORS[e.category] || '#ccc'}22;color:${CATEGORIA_COLORS[e.category] || '#333'}">${esc(e.category)}</span></td>
+      <td>${e.num_courts}</td>
+      <td>${e.status}</td>
+      <td><button class="btn small secondary ev-edit" data-id="${e.id}">Editar</button></td>
+    </tr>`;
+  }
+  function eventCard(e) {
+    return `<div class="cls ev-edit" data-id="${e.id}" style="background:${CATEGORIA_COLORS[e.category] || '#666'};display:inline-block;margin:3px;cursor:pointer">
+      ${esc(e.company)} · ${esc(e.clubs?.name || '')} · ${e.start_hour}-${e.end_hour}</div>`;
+  }
+
+  function openEventForm(ev) {
+    const modal = openModal(ev ? 'Editar evento' : 'Nuevo evento', `
+      <div class="row">
+        <div class="field"><label>Club</label><select id="e-club">${state.clubs.map((c) => `<option value="${c.id}" ${ev?.club_id===c.id?'selected':''}>${esc(c.name)}</option>`).join('')}</select></div>
+        <div class="field"><label>Empresa/Cliente</label><input id="e-company" value="${esc(ev?.company || '')}" /></div>
+      </div>
+      <div class="row">
+        <div class="field"><label>Fecha</label><input type="date" id="e-date" value="${ev?.date || todayISO()}" /></div>
+        <div class="field"><label>Fecha fin (opcional)</label><input type="date" id="e-end-date" value="${ev?.end_date || ''}" /></div>
+      </div>
+      <div class="row">
+        <div class="field"><label>Hora inicio</label><input id="e-start" value="${esc(ev?.start_hour || '10:00')}" /></div>
+        <div class="field"><label>Hora fin</label><input id="e-end" value="${esc(ev?.end_hour || '12:00')}" /></div>
+        <div class="field"><label>Nº pistas</label><input type="number" id="e-courts" value="${ev?.num_courts ?? 1}" /></div>
+      </div>
+      <div class="row">
+        <div class="field"><label>Categoría</label><select id="e-cat">${Object.keys(CATEGORIA_COLORS).map((c) => `<option ${ev?.category===c?'selected':''}>${c}</option>`).join('')}</select></div>
+        <div class="field"><label>Estado</label><select id="e-status"><option value="tentativo" ${ev?.status==='tentativo'?'selected':''}>Tentativo</option><option value="confirmado" ${!ev||ev.status==='confirmado'?'selected':''}>Confirmado</option><option value="cancelado" ${ev?.status==='cancelado'?'selected':''}>Cancelado</option></select></div>
+      </div>
+      <div class="row">
+        <div class="field"><label>Contacto - nombre</label><input id="e-contact-name" value="${esc(ev?.contact_name || '')}" /></div>
+        <div class="field"><label>Contacto - email</label><input type="email" id="e-contact-email" value="${esc(ev?.contact_email || '')}" /></div>
+        <div class="field"><label>Contacto - teléfono</label><input id="e-contact-phone" value="${esc(ev?.contact_phone || '')}" /></div>
+      </div>
+      <div class="field"><label><input type="checkbox" id="e-catering" style="width:auto" ${ev?.extras?.catering?'checked':''}/> Necesita catering / material extra (avisa al proveedor)</label></div>
+      <button class="btn" id="e-save" style="width:100%">Guardar</button>
+    `, { wide: true });
+
+    qs('#e-save', modal).onclick = async () => {
+      const payload = {
+        club_id: qs('#e-club', modal).value,
+        company: qs('#e-company', modal).value.trim(),
+        date: qs('#e-date', modal).value,
+        end_date: qs('#e-end-date', modal).value || null,
+        start_hour: qs('#e-start', modal).value.trim(),
+        end_hour: qs('#e-end', modal).value.trim(),
+        num_courts: Number(qs('#e-courts', modal).value) || 1,
+        category: qs('#e-cat', modal).value,
+        status: qs('#e-status', modal).value,
+        contact_name: qs('#e-contact-name', modal).value.trim() || null,
+        contact_email: qs('#e-contact-email', modal).value.trim() || null,
+        contact_phone: qs('#e-contact-phone', modal).value.trim() || null,
+        extras: { catering: qs('#e-catering', modal).checked },
+      };
+      if (!payload.company || !payload.date) return toast('Empresa y fecha son obligatorias.', true);
+      const wasCatering = ev?.extras?.catering;
+      const { error } = ev
+        ? await supabase.from('events').update(payload).eq('id', ev.id)
+        : await supabase.from('events').insert(payload);
+      if (error) return toast(error.message, true);
+      if (payload.extras.catering && !wasCatering && EVENTOS_PROVEEDOR_EMAIL) {
+        const tmpl = state.emailTemplates.find((t) => t.key === 'aviso_evento');
+        try {
+          await sendEmail({
+            to: EVENTOS_PROVEEDOR_EMAIL,
+            subject: tmpl ? fillTemplate(tmpl.subject, { club: state.clubs.find(c=>c.id===payload.club_id)?.name }) : `Nuevo evento con catering: ${payload.company}`,
+            html: (tmpl ? fillTemplate(tmpl.body, { nombre: payload.company, club: state.clubs.find(c=>c.id===payload.club_id)?.name, fecha: fmtDate(payload.date) }) : `Evento de ${payload.company} el ${fmtDate(payload.date)}, necesita catering/material extra.`).replace(/\n/g, '<br/>'),
+          });
+          toast('Aviso enviado al proveedor.');
+        } catch (err) { toast('Evento guardado, pero falló el aviso al proveedor: ' + err.message, true); }
+      }
+      modal.remove(); toast('Evento guardado.'); await load();
+    };
+  }
+
+  function openEventMassEmail(list) {
+    const recipients = list.filter((e) => e.contact_email);
+    const modal = openModal('Email masivo a contactos de eventos', `
+      <p class="muted">${recipients.length} contactos con email en el filtro actual.</p>
+      <div class="field"><label>Asunto</label><input id="eme-subject" /></div>
+      <div class="field"><label>Cuerpo (admite {{nombre}}, {{club}}, {{fecha}})</label><textarea id="eme-body" rows="6"></textarea></div>
+      <button class="btn" id="eme-send" style="width:100%">Enviar</button>
+    `, { wide: true });
+    qs('#eme-send', modal).onclick = async () => {
+      const subject = qs('#eme-subject', modal).value.trim(); const bodyTxt = qs('#eme-body', modal).value;
+      if (!subject || !bodyTxt || !recipients.length) return toast('Faltan datos o no hay destinatarios.', true);
+      for (const e of recipients) {
+        await sendEmail({ to: e.contact_email, subject: fillTemplate(subject, { nombre: e.contact_name || e.company, club: e.clubs?.name, fecha: fmtDate(e.date) }),
+          html: fillTemplate(bodyTxt, { nombre: e.contact_name || e.company, club: e.clubs?.name, fecha: fmtDate(e.date) }).replace(/\n/g, '<br/>') });
+      }
+      toast(`Enviado a ${recipients.length} contactos.`);
+      modal.remove();
+    };
+  }
+};
+
+// ---------- GESTIÓN: PLANTILLAS DE EMAIL ----------
+MODULES.plantillas = async (content) => {
+  content.innerHTML = `<div class="content-header"><h1>Plantillas de email</h1></div>
+    <div class="tip">Usa variables como {{nombre}}, {{club}}, {{fecha}} — se sustituyen automáticamente al enviar.</div>
+    <div id="templates-body"></div>`;
+  render();
+
+  function render() {
+    qs('#templates-body').innerHTML = state.emailTemplates.map((t) => `
+      <div class="card" style="margin-bottom:10px">
+        <div class="content-header"><h3>${esc(t.name)} <span class="muted">(${t.key})</span></h3></div>
+        <div class="field"><label>Asunto</label><input class="tpl-subject" data-id="${t.id}" value="${esc(t.subject)}" /></div>
+        <div class="field"><label>Cuerpo</label><textarea class="tpl-body" data-id="${t.id}" rows="5">${esc(t.body)}</textarea></div>
+        <div class="row" style="align-items:center">
+          <input type="file" class="tpl-file hidden" data-id="${t.id}" />
+          <button class="btn small secondary tpl-attach" data-id="${t.id}">${t.attachment_url ? 'Cambiar adjunto' : 'Añadir adjunto fijo'}</button>
+          ${t.attachment_url ? `<a href="${t.attachment_url}" target="_blank">📎 ${esc(t.attachment_name || '')}</a>` : ''}
+          <button class="btn small tpl-save" data-id="${t.id}">Guardar</button>
+        </div>
+      </div>`).join('');
+    qsa('.tpl-attach', qs('#templates-body')).forEach((b) => b.onclick = () => qs(`.tpl-file[data-id="${b.dataset.id}"]`).click());
+    qsa('.tpl-file', qs('#templates-body')).forEach((f) => f.onchange = async () => {
+      const file = f.files[0]; if (!file) return;
+      const up = await uploadAttachment(file);
+      await supabase.from('email_templates').update({ attachment_url: up.url, attachment_name: up.name }).eq('id', f.dataset.id);
+      toast('Adjunto guardado.');
+      const { data } = await supabase.from('email_templates').select('*'); state.emailTemplates = data || []; render();
+    });
+    qsa('.tpl-save', qs('#templates-body')).forEach((b) => b.onclick = async () => {
+      const subject = qs(`.tpl-subject[data-id="${b.dataset.id}"]`).value;
+      const body = qs(`.tpl-body[data-id="${b.dataset.id}"]`).value;
+      const { error } = await supabase.from('email_templates').update({ subject, body }).eq('id', b.dataset.id);
+      if (error) return toast(error.message, true);
+      toast('Plantilla guardada.');
+      const { data } = await supabase.from('email_templates').select('*'); state.emailTemplates = data || [];
+    });
+  }
+};
+
+// ---------- GESTIÓN: PLAYTOMIC MANAGER ----------
+// Panel de solo lectura/depuración: muestra tal cual llegan las reservas
+// desde la Edge Function playtomic-proxy, para poder comprobar que el
+// mapeo de nombres de entrenador y la conexión funcionan.
+MODULES.playtomic = async (content) => {
+  const club = currentClub();
+  content.innerHTML = `
+    <div class="content-header"><h1>Playtomic Manager</h1></div>
+    <div class="tip">Panel de solo lectura para depurar la integración. No escribe nada en Playtomic ni guarda copia de las reservas.</div>
+    <div class="row">
+      <div class="field"><label>Desde</label><input type="date" id="pt-from" value="${todayISO()}" /></div>
+      <div class="field"><label>Hasta</label><input type="date" id="pt-to" value="${todayISO()}" /></div>
+      <div class="field" style="align-self:flex-end"><button class="btn" id="pt-load">Consultar</button></div>
+    </div>
+    <div id="pt-body"></div>
+  `;
+  qs('#pt-load').onclick = load;
+
+  async function load() {
+    const body = qs('#pt-body');
+    body.innerHTML = '<p class="muted">Consultando Playtomic…</p>';
+    try {
+      const bookings = await fetchPlaytomicBookings(qs('#pt-from').value, qs('#pt-to').value);
+      if (!bookings.length) { body.innerHTML = '<p class="muted">Sin reservas en ese rango.</p>'; return; }
+      body.innerHTML = `<table><thead><tr><th>Fecha</th><th>Hora</th><th>Pista</th><th>Entrenador (Playtomic)</th><th>Casa con</th><th>Pago</th><th>Jugadores</th></tr></thead>
+        <tbody>${bookings.map((b) => {
+          const matched = state.trainers.find((t) => t.external_system_name && t.external_system_name.trim().toLowerCase() === (b.trainer_name || '').trim().toLowerCase());
+          return `<tr><td>${b.date || '-'}</td><td>${b.start || '-'} - ${b.end || '-'}</td><td>${esc(b.court || '-')}</td>
+            <td>${esc(b.trainer_name || '-')}</td><td>${matched ? '✅ ' + esc(matched.name) : '<span class="muted">sin casar</span>'}</td>
+            <td>${esc(b.payment_status || '-')}</td><td>${b.participants ?? '-'}</td></tr>`;
+        }).join('')}</tbody></table>`;
+    } catch (err) {
+      body.innerHTML = `<div class="warn">No se pudo conectar con Playtomic: ${esc(err.message)}.
+        Revisa que la Edge Function <code>playtomic-proxy</code> tenga configurados los secretos PLAYTOMIC_CLIENT_ID / PLAYTOMIC_CLIENT_SECRET / PLAYTOMIC_TENANT_ID, y que la URL del endpoint de reservas coincida con la documentación oficial vigente de Playtomic (verificar antes de dar por bueno cualquier dato).</div>`;
+    }
+  }
+  load();
+};
+
+function loadNotifSubs() { renderNotifPanel(); }
+function renderNotifPanel() {
+  const panel = qs('#notif-panel');
+  if (!state.notifSubs.length) { panel.classList.add('hidden'); return; }
+  panel.classList.remove('hidden');
+  qs('#notif-body').innerHTML = state.notifSubs.map((n) => `<div class="muted">${esc(n.msg)}</div>`).join('');
+}
+qs('#notif-close').onclick = () => qs('#notif-panel').classList.add('hidden');
+
+</script>
+</body>
+</html>

@@ -123,6 +123,14 @@ Deno.serve(async (req) => {
 
     const bookings = await bookingsRes.json();
 
+    // Playtomic devuelve en el mismo endpoint partidos entre socios, clases
+    // de academia, clases particulares y torneos, distinguidos por
+    // `booking_type`. Para la Parrilla/KPIs del CRM solo nos interesan las
+    // clases (de grupo o particulares) — nunca los partidos sueltos entre
+    // socios ni los torneos, así que se filtran aquí antes de llegar al
+    // frontend.
+    const RELEVANT_BOOKING_TYPES = ["class", "lesson"];
+
     // Normalizamos al formato mínimo que consume la Parrilla/KPIs. Ojo:
     // `coach_ids` son IDs de Playtomic, no nombres — si tu cuenta no expone
     // el nombre del profesor en este mismo payload, el casado por nombre en
@@ -131,12 +139,16 @@ Deno.serve(async (req) => {
     // Playtomic (no cubierto aquí; revisar la respuesta real una vez
     // conectado para confirmar si añade el nombre en algún otro campo).
     const list = Array.isArray(bookings) ? bookings : bookings.data ?? [];
-    const normalized = list.map((b: any) => ({
+    const onlyClasses = list.filter((b: any) =>
+      RELEVANT_BOOKING_TYPES.includes(String(b.booking_type ?? "").toLowerCase())
+    );
+    const normalized = onlyClasses.map((b: any) => ({
       id: b.booking_id ?? b.id,
       court: b.resource_name ?? b.resource_id,
       date: (b.booking_start_date ?? "").slice(0, 10),
       start: (b.booking_start_date ?? "").slice(11, 16),
       end: (b.booking_end_date ?? "").slice(11, 16),
+      booking_type: b.booking_type ?? null,
       trainer_name: b.instructor_name ?? b.coach_name ?? null,
       coach_ids: b.coach_ids ?? [],
       payment_status: b.payment_status ?? null,

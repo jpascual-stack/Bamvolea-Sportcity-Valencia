@@ -1805,7 +1805,7 @@ MODULES.playtomic = async (content) => {
   const club = currentClub();
   content.innerHTML = `
     <div class="content-header"><h1>Playtomic Manager</h1></div>
-    <div class="tip">Panel de solo lectura para depurar la integración. No escribe nada en Playtomic ni guarda copia de las reservas.</div>
+    <div class="tip">Panel de solo lectura para depurar la integración. No escribe nada en Playtomic ni guarda copia de las reservas. Solo se muestran clases de academia y clases particulares — los partidos entre socios y los torneos se descartan automáticamente en la Edge Function.</div>
     <div class="row">
       <div class="field"><label>Desde</label><input type="date" id="pt-from" value="${todayISO()}" /></div>
       <div class="field"><label>Hasta</label><input type="date" id="pt-to" value="${todayISO()}" /></div>
@@ -1820,11 +1820,11 @@ MODULES.playtomic = async (content) => {
     body.innerHTML = '<p class="muted">Consultando Playtomic…</p>';
     try {
       const bookings = await fetchPlaytomicBookings(qs('#pt-from').value, qs('#pt-to').value);
-      if (!bookings.length) { body.innerHTML = '<p class="muted">Sin reservas en ese rango.</p>'; return; }
-      body.innerHTML = `<table><thead><tr><th>Fecha</th><th>Hora</th><th>Pista</th><th>Entrenador (Playtomic)</th><th>Casa con</th><th>Pago</th><th>Jugadores</th></tr></thead>
+      if (!bookings.length) { body.innerHTML = '<p class="muted">Sin clases de academia/particulares en ese rango (los partidos y torneos no se cuentan).</p>'; return; }
+      body.innerHTML = `<table><thead><tr><th>Fecha</th><th>Hora</th><th>Tipo</th><th>Pista</th><th>Entrenador (Playtomic)</th><th>Casa con</th><th>Pago</th><th>Jugadores</th></tr></thead>
         <tbody>${bookings.map((b) => {
           const matched = state.trainers.find((t) => t.external_system_name && t.external_system_name.trim().toLowerCase() === (b.trainer_name || '').trim().toLowerCase());
-          return `<tr><td>${b.date || '-'}</td><td>${b.start || '-'} - ${b.end || '-'}</td><td>${esc(b.court || '-')}</td>
+          return `<tr><td>${b.date || '-'}</td><td>${b.start || '-'} - ${b.end || '-'}</td><td>${esc(b.booking_type || '-')}</td><td>${esc(b.court || '-')}</td>
             <td>${esc(b.trainer_name || '-')}</td><td>${matched ? '✅ ' + esc(matched.name) : '<span class="muted">sin casar</span>'}</td>
             <td>${esc(b.payment_status || '-')}</td><td>${b.participants ?? '-'}</td></tr>`;
         }).join('')}</tbody></table>`;

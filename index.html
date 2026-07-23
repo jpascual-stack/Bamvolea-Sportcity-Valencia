@@ -218,6 +218,19 @@ function isPlaytomicClassBooking(b) {
   if (b.is_canceled) return false;
   return PLAYTOMIC_CLASS_TYPES.includes(String(b.booking_type ?? '').toLowerCase());
 }
+// Casa una reserva de Playtomic con un entrenador del CRM. Prioriza el ID
+// real de Playtomic (trainers.playtomic_coach_id, más fiable) y solo si no
+// está configurado cae al casado por nombre (external_system_name), que
+// puede fallar por no venir el nombre en el payload (ver coach_ids).
+function matchPlaytomicTrainer(booking, trainer) {
+  if (trainer.playtomic_coach_id && booking.coach_ids?.length) {
+    return booking.coach_ids.includes(trainer.playtomic_coach_id);
+  }
+  if (trainer.external_system_name && booking.trainer_name) {
+    return booking.trainer_name.trim().toLowerCase() === trainer.external_system_name.trim().toLowerCase();
+  }
+  return false;
+}
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const FN_URL = `${SUPABASE_URL}/functions/v1`;
@@ -1370,11 +1383,11 @@ MODULES.kpis = async (content) => {
     if (bookings && bookings.length) {
       const byTrainer = {};
       clubTrainers.forEach((t) => {
-        const mine = bookings.filter((b) => b.trainer_name && t.external_system_name && b.trainer_name.trim().toLowerCase() === t.external_system_name.trim().toLowerCase());
+        const mine = bookings.filter((b) => matchPlaytomicTrainer(b, t));
         byTrainer[t.id] = { total: mine.length };
       });
       monthData = { source: 'real', byTrainer };
-      qs('#kpi-note').textContent = 'Datos REALES (reservas casadas por nombre de entrenador desde Playtomic).';
+      qs('#kpi-note').textContent = 'Datos REALES (reservas casadas por ID de Playtomic cuando está configurado, o por nombre de entrenador si no).';
     } else {
       const daysInMonth = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0).getDate();
       const byTrainer = {};
@@ -1428,14 +1441,14 @@ MODULES.entrenadores = async (content) => {
   render();
 
   function render() {
-    qs('#trainers-body').innerHTML = `<table><thead><tr><th>Nombre</th><th>Contacto</th><th>Clubs</th><th>PIN</th><th>Color</th><th>Nombre en Playtomic</th><th></th></tr></thead>
+    qs('#trainers-body').innerHTML = `<table><thead><tr><th>Nombre</th><th>Contacto</th><th>Clubs</th><th>PIN</th><th>Color</th><th>ID Playtomic</th><th></th></tr></thead>
       <tbody>${state.trainers.map((t) => `<tr>
         <td>${esc(t.name)}</td>
         <td>${esc(t.email || '')}<br/>${esc(t.phone || '')}</td>
         <td>${t.clubs.map((cid) => esc(state.clubs.find((c) => c.id === cid)?.name || '')).join(', ')}</td>
         <td>••••</td>
         <td><span style="display:inline-block;width:14px;height:14px;border-radius:3px;background:${t.color}"></span></td>
-        <td>${esc(t.external_system_name || '-')}</td>
+        <td>${esc(t.playtomic_coach_id || t.external_system_name || '-')}</td>
         <td><button class="btn small secondary edit-trainer" data-id="${t.id}">Editar</button></td>
       </tr>`).join('') || '<tr><td colspan="7" class="muted">Sin entrenadores dados de alta.</td></tr>'}</tbody></table>`;
     qsa('.edit-trainer', qs('#trainers-body')).forEach((b) => b.onclick = () => openTrainerForm(state.trainers.find((t) => t.id === b.dataset.id)));
@@ -1453,8 +1466,12 @@ MODULES.entrenadores = async (content) => {
       </div>
       <div class="row">
         <div class="field"><label>Color en la Parrilla</label><input type="color" id="t-color" value="${trainer?.color || '#2f6f4f'}" /></div>
-        <div class="field"><label>Nombre exacto en Playtomic (para casar KPIs)</label><input id="t-ext" value="${esc(trainer?.external_system_name || '')}" /></div>
       </div>
+      <div class="row">
+        <div class="field"><label>ID de Playtomic (recomendado)</label><input id="t-coach-id" value="${esc(trainer?.playtomic_coach_id || '')}" placeholder="cópialo de Gestión → Playtomic Manager" /></div>
+        <div class="field"><label>Nombre exacto en Playtomic (respaldo si no hay ID)</label><input id="t-ext" value="${esc(trainer?.external_system_name || '')}" /></div>
+      </div>
+      <div class="tip">Para conseguir el ID: ve a Gestión → Playtomic Manager, consulta un rango donde este entrenador dé una clase, y copia el valor de la columna "coach_ids" en esa fila.</div>
       <div class="field"><label>Clubs donde trabaja</label>
         ${state.clubs.map((c) => `<label style="font-weight:400"><input type="checkbox" class="t-club" value="${c.id}" style="width:auto" ${trainer?.clubs?.includes(c.id)?'checked':''}/> ${esc(c.name)}</label>`).join('<br/>')}
       </div>
@@ -1476,6 +1493,7 @@ MODULES.entrenadores = async (content) => {
         email: qs('#t-email', modal).value.trim() || null,
         phone: qs('#t-phone', modal).value.trim() || null,
         color: qs('#t-color', modal).value,
+        playtomic_coach_id: qs('#t-coach-id', modal).value.trim() || null,
         external_system_name: qs('#t-ext', modal).value.trim() || null,
         clubs: qsa('.t-club:checked', modal).map((cb) => cb.value),
         availability,
@@ -1839,11 +1857,11 @@ MODULES.playtomic = async (content) => {
           : `<p class="muted">Sin clases de academia/particulares en ese rango. Si sabes que sí había clases, marca "Mostrar todos los tipos" y mira qué valor aparece en la columna Tipo — puede que tu cuenta use otro nombre distinto de "${PLAYTOMIC_CLASS_TYPES.join('"/"')}".</p>`;
         return;
       }
-      body.innerHTML = `<table><thead><tr><th>Fecha</th><th>Hora</th><th>Tipo</th><th>Pista</th><th>Entrenador (Playtomic)</th><th>Casa con</th><th>Pago</th><th>Jugadores</th></tr></thead>
+      body.innerHTML = `<table><thead><tr><th>Fecha</th><th>Hora</th><th>Tipo</th><th>Pista</th><th>coach_ids (Playtomic)</th><th>Casa con</th><th>Pago</th><th>Jugadores</th></tr></thead>
         <tbody>${bookings.map((b) => {
-          const matched = state.trainers.find((t) => t.external_system_name && t.external_system_name.trim().toLowerCase() === (b.trainer_name || '').trim().toLowerCase());
+          const matched = state.trainers.find((t) => matchPlaytomicTrainer(b, t));
           return `<tr><td>${b.date || '-'}</td><td>${b.start || '-'} - ${b.end || '-'}</td><td>${esc(b.booking_type || '-')}</td><td>${esc(b.court || '-')}</td>
-            <td>${esc(b.trainer_name || '-')}</td><td>${matched ? '✅ ' + esc(matched.name) : '<span class="muted">sin casar</span>'}</td>
+            <td>${esc((b.coach_ids || []).join(', ') || '-')}</td><td>${matched ? '✅ ' + esc(matched.name) : '<span class="muted">sin casar</span>'}</td>
             <td>${esc(b.payment_status || '-')}</td><td>${b.participants ?? '-'}</td></tr>`;
         }).join('')}</tbody></table>`;
     } catch (err) {

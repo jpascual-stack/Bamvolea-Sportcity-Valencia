@@ -92,7 +92,8 @@ create table trainers (
   clubs uuid[] not null default '{}',
   color text not null default '#2f6f4f',
   availability jsonb not null default '{}', -- {"lunes":[["16:00","21:00"]], ...}
-  external_system_name text, -- para casar por nombre con Playtomic
+  external_system_name text, -- para casar por nombre con Playtomic (respaldo si no hay ID)
+  playtomic_coach_id text, -- id real del profesor en Playtomic (coach_ids de /bookings); más fiable que el nombre
   active boolean not null default true,
   created_at timestamptz not null default now()
 );

@@ -277,7 +277,15 @@ function fmtDate(d) {
   const dt = typeof d === 'string' ? new Date(d + (d.length === 10 ? 'T00:00:00' : '')) : d;
   return dt.toLocaleDateString('es-ES');
 }
-function todayISO() { return new Date().toISOString().slice(0, 10); }
+// OJO: nunca usar Date#toISOString() para sacar "la fecha de hoy/este día"
+// tal cual la vive el usuario — convierte a UTC y puede desplazar el día
+// (España va por delante de UTC, así que entre las 00:00 y las 02:00
+// locales saldría el día de ayer). Se construye la cadena a mano con los
+// componentes locales del Date.
+function isoDate(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+function todayISO() { return isoDate(new Date()); }
 function currentClub() { return state.clubs.find((c) => c.id === state.selectedClubId); }
 
 async function uploadAttachment(file) {
@@ -699,7 +707,6 @@ function mondayOf(d) {
   const x = new Date(d); const day = (x.getDay() + 6) % 7; // 0=lunes
   x.setDate(x.getDate() - day); x.setHours(0, 0, 0, 0); return x;
 }
-function isoDate(d) { return d.toISOString().slice(0, 10); }
 function extractCourtNumber(text) {
   const m = String(text ?? '').match(/(\d+)/);
   return m ? Number(m[1]) : null;

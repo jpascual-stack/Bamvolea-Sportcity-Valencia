@@ -19,6 +19,26 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Playtomic devuelve booking_start_date/booking_end_date en UTC (sin
+// indicarlo con "Z"), pero el club está en España — hay que convertir a
+// hora local antes de mostrarla, si no todo sale ~2h antes en verano (CEST)
+// o ~1h antes en invierno (CET). Si tu club estuviera en otra franja
+// horaria, cambia CLUB_TIMEZONE.
+const CLUB_TIMEZONE = "Europe/Madrid";
+function toClubLocalDateTime(rawTimestamp: string | undefined): { date: string; time: string } {
+  if (!rawTimestamp) return { date: "", time: "" };
+  const hasOffset = /[zZ]$|[+-]\d{2}:\d{2}$/.test(rawTimestamp);
+  const d = new Date(hasOffset ? rawTimestamp : `${rawTimestamp}Z`);
+  if (isNaN(d.getTime())) return { date: "", time: "" };
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-CA", {
+      timeZone: CLUB_TIMEZONE,
+      year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false,
+    }).formatToParts(d).map((p) => [p.type, p.value]),
+  );
+  return { date: `${parts.year}-${parts.month}-${parts.day}`, time: `${parts.hour}:${parts.minute}` };
+}
+
 // Host real de la API (distinto del sitio de documentación, que lleva guion:
 // third-party.playtomic.io).
 const PLAYTOMIC_AUTH_URL = "https://thirdparty.playtomic.io/api/v1/oauth/token";
@@ -150,19 +170,23 @@ Deno.serve(async (req) => {
     // hasta resolver esos IDs contra el endpoint de profesores/empleados de
     // Playtomic (no cubierto aquí; revisar la respuesta real una vez
     // conectado para confirmar si añade el nombre en algún otro campo).
-    const normalized = bookings.map((b: any) => ({
-      id: b.booking_id ?? b.id,
-      court: b.resource_name ?? b.resource_id,
-      date: (b.booking_start_date ?? "").slice(0, 10),
-      start: (b.booking_start_date ?? "").slice(11, 16),
-      end: (b.booking_end_date ?? "").slice(11, 16),
-      booking_type: b.booking_type ?? null,
-      is_canceled: b.is_canceled ?? (b.status === "CANCELED"),
-      trainer_name: b.instructor_name ?? b.coach_name ?? null,
-      coach_ids: b.coach_ids ?? [],
-      payment_status: b.payment_status ?? null,
-      participants: b.participant_info?.participants?.length ?? null,
-    }));
+    const normalized = bookings.map((b: any) => {
+      const startLocal = toClubLocalDateTime(b.booking_start_date);
+      const endLocal = toClubLocalDateTime(b.booking_end_date);
+      return {
+        id: b.booking_id ?? b.id,
+        court: b.resource_name ?? b.resource_id,
+        date: startLocal.date,
+        start: startLocal.time,
+        end: endLocal.time,
+        booking_type: b.booking_type ?? null,
+        is_canceled: b.is_canceled ?? (b.status === "CANCELED"),
+        trainer_name: b.instructor_name ?? b.coach_name ?? null,
+        coach_ids: b.coach_ids ?? [],
+        payment_status: b.payment_status ?? null,
+        participants: b.participant_info?.participants?.length ?? null,
+      };
+    });
 
     return new Response(JSON.stringify({ bookings: normalized }), {
       status: 200,

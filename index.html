@@ -209,13 +209,13 @@ const EVENTOS_PROVEEDOR_EMAIL = window.EVENTOS_PROVEEDOR_EMAIL || '';
 const CATEGORIA_COLORS = {
   'Torneo externo': '#7a4fb5', 'Alquiler empresa': '#2f6f4f', 'Actividad puntual': '#d98c3a', 'Otro': '#66756f',
 };
-// Playtomic devuelve en el mismo feed partidos entre socios, clases y
-// torneos mezclados (campo booking_type). Para KPIs solo cuentan clases y
-// clases particulares — ajusta esta lista si tu cuenta usa otros valores
-// (compruébalo con el interruptor "mostrar todos los tipos" en Playtomic
-// Manager, que enseña el valor real de cada reserva).
-const PLAYTOMIC_CLASS_TYPES = ['class', 'lesson'];
+// Playtomic devuelve en el mismo feed partidos entre socios (OPEN_MATCH,
+// REGULAR_BOOKING), clases y cursos de academia (COURSE_CLASS), clases
+// particulares (PRIVATE_CLASS) y torneos mezclados. Confirmado contra una
+// cuenta real: solo nos interesan COURSE_CLASS y PRIVATE_CLASS.
+const PLAYTOMIC_CLASS_TYPES = ['course_class', 'private_class'];
 function isPlaytomicClassBooking(b) {
+  if (b.is_canceled) return false;
   return PLAYTOMIC_CLASS_TYPES.includes(String(b.booking_type ?? '').toLowerCase());
 }
 

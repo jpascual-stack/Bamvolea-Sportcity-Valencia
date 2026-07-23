@@ -144,6 +144,7 @@ Deno.serve(async (req) => {
       start: (b.booking_start_date ?? "").slice(11, 16),
       end: (b.booking_end_date ?? "").slice(11, 16),
       booking_type: b.booking_type ?? null,
+      is_canceled: b.is_canceled ?? (b.status === "CANCELED"),
       trainer_name: b.instructor_name ?? b.coach_name ?? null,
       coach_ids: b.coach_ids ?? [],
       payment_status: b.payment_status ?? null,

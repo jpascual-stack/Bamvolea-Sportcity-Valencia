@@ -1857,12 +1857,13 @@ MODULES.playtomic = async (content) => {
           : `<p class="muted">Sin clases de academia/particulares en ese rango. Si sabes que sí había clases, marca "Mostrar todos los tipos" y mira qué valor aparece en la columna Tipo — puede que tu cuenta use otro nombre distinto de "${PLAYTOMIC_CLASS_TYPES.join('"/"')}".</p>`;
         return;
       }
-      body.innerHTML = `<table><thead><tr><th>Fecha</th><th>Hora</th><th>Tipo</th><th>Pista</th><th>coach_ids (Playtomic)</th><th>Casa con</th><th>Pago</th><th>Jugadores</th></tr></thead>
+      body.innerHTML = `<table><thead><tr><th>Fecha</th><th>Hora</th><th>Tipo</th><th>Pista</th><th>coach_ids (Playtomic)</th><th>Casa con</th><th>Pago</th><th>Jugadores</th><th>Participantes (crudo)</th></tr></thead>
         <tbody>${bookings.map((b) => {
           const matched = state.trainers.find((t) => matchPlaytomicTrainer(b, t));
           return `<tr><td>${b.date || '-'}</td><td>${b.start || '-'} - ${b.end || '-'}</td><td>${esc(b.booking_type || '-')}</td><td>${esc(b.court || '-')}</td>
             <td>${esc((b.coach_ids || []).join(', ') || '-')}</td><td>${matched ? '✅ ' + esc(matched.name) : '<span class="muted">sin casar</span>'}</td>
-            <td>${esc(b.payment_status || '-')}</td><td>${b.participants ?? '-'}</td></tr>`;
+            <td>${esc(b.payment_status || '-')}</td><td>${b.participants ?? '-'}</td>
+            <td><code style="font-size:11px;white-space:pre-wrap;word-break:break-all">${esc(JSON.stringify(b.participants_raw))}</code></td></tr>`;
         }).join('')}</tbody></table>`;
     } catch (err) {
       body.innerHTML = `<div class="warn">No se pudo conectar con Playtomic: ${esc(err.message)}.

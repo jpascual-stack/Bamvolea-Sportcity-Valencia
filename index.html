@@ -746,7 +746,7 @@ MODULES.parrilla = async (content) => {
         .or(`date.is.null,and(date.gte.${weekStartISO},date.lte.${weekEndISO})`),
       fetchStudentsView(club.id),
       supabase.from('class_types').select('*').eq('club_id', club.id).then(r => r.data || []),
-      supabase.from('classes').select('trainer_id, day, hour, club_id, date'), // para detectar dobles clases del mismo profesor en cualquier club
+      supabase.from('classes').select('trainer_id, day, hour, club_id, date').then((r) => r.data || []), // para detectar dobles clases del mismo profesor en cualquier club
     ]);
     return { classes: classes || [], students, classTypes, trainersAll: trainersAll || [] };
   }

@@ -102,26 +102,40 @@ Deno.serve(async (req) => {
 
     // La API solo conserva reservas de los últimos ~3 meses y espera fecha+
     // hora ISO en start_booking_date/end_booking_date, no solo la fecha.
-    const params = new URLSearchParams({
-      tenant_id: tenantId ?? "",
-      start_booking_date: `${dateFrom}T00:00:00`,
-      end_booking_date: `${dateTo}T23:59:59`,
-      size: "100",
-    });
-
-    const bookingsRes = await fetch(`${PLAYTOMIC_BOOKINGS_URL}?${params}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-
-    if (!bookingsRes.ok) {
-      const detail = await bookingsRes.text();
-      return new Response(JSON.stringify({ error: "Fallo al leer reservas de Playtomic", detail }), {
-        status: 502,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+    // Un club con muchas pistas puede tener muchas más de 100 reservas en un
+    // solo día (partidos + clases), así que hay que paginar: si no, se
+    // pierden en silencio las reservas que caen en la página 2 en adelante
+    // (la API las ordena de más reciente a más antigua, así que lo que se
+    // pierde suele ser precisamente lo más temprano del día).
+    const PAGE_SIZE = 100;
+    const MAX_PAGES = 20; // margen de seguridad para no encadenar páginas sin fin
+    let bookings: any[] = [];
+    for (let page = 0; page < MAX_PAGES; page++) {
+      const params = new URLSearchParams({
+        tenant_id: tenantId ?? "",
+        start_booking_date: `${dateFrom}T00:00:00`,
+        end_booking_date: `${dateTo}T23:59:59`,
+        size: String(PAGE_SIZE),
+        page: String(page),
       });
-    }
 
-    const bookings = await bookingsRes.json();
+      const bookingsRes = await fetch(`${PLAYTOMIC_BOOKINGS_URL}?${params}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!bookingsRes.ok) {
+        const detail = await bookingsRes.text();
+        return new Response(JSON.stringify({ error: "Fallo al leer reservas de Playtomic", detail }), {
+          status: 502,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const json = await bookingsRes.json();
+      const pageItems: any[] = Array.isArray(json) ? json : json.data ?? [];
+      bookings = bookings.concat(pageItems);
+      if (pageItems.length < PAGE_SIZE) break; // última página
+    }
 
     // Playtomic devuelve en el mismo endpoint partidos entre socios, clases
     // de academia, clases particulares y torneos, distinguidos por
@@ -136,8 +150,7 @@ Deno.serve(async (req) => {
     // hasta resolver esos IDs contra el endpoint de profesores/empleados de
     // Playtomic (no cubierto aquí; revisar la respuesta real una vez
     // conectado para confirmar si añade el nombre en algún otro campo).
-    const list = Array.isArray(bookings) ? bookings : bookings.data ?? [];
-    const normalized = list.map((b: any) => ({
+    const normalized = bookings.map((b: any) => ({
       id: b.booking_id ?? b.id,
       court: b.resource_name ?? b.resource_id,
       date: (b.booking_start_date ?? "").slice(0, 10),

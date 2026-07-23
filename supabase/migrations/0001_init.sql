@@ -180,9 +180,18 @@ create table classes (
   capacity int not null default 4,
   court int,
   trainer_id uuid references trainers(id) on delete set null,
-  created_at timestamptz not null default now(),
-  unique (club_id, day, hour, court)
+  -- date=null: plantilla manual recurrente (se repite cada semana). Con
+  -- fecha: instancia real sincronizada desde Playtomic para ese día en
+  -- concreto (ver playtomic_booking_id/source/participant_names).
+  date date,
+  playtomic_booking_id text unique,
+  source text not null default 'manual' check (source in ('manual', 'playtomic')),
+  participant_names text[] not null default '{}',
+  created_at timestamptz not null default now()
 );
+
+create unique index classes_manual_slot_unique on classes (club_id, day, hour, court) where date is null;
+create unique index classes_dated_slot_unique on classes (club_id, date, hour, court) where date is not null;
 
 create table class_students (
   class_id uuid not null references classes(id) on delete cascade,

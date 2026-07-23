@@ -695,36 +695,76 @@ MODULES.tareas = async (content) => {
 // ---------- ACADEMIA: PARRILLA ----------
 const HOURS = Array.from({ length: 15 }, (_, i) => `${String(8 + i).padStart(2, '0')}:00`);
 
+function mondayOf(d) {
+  const x = new Date(d); const day = (x.getDay() + 6) % 7; // 0=lunes
+  x.setDate(x.getDate() - day); x.setHours(0, 0, 0, 0); return x;
+}
+function isoDate(d) { return d.toISOString().slice(0, 10); }
+function extractCourtNumber(text) {
+  const m = String(text ?? '').match(/(\d+)/);
+  return m ? Number(m[1]) : null;
+}
+
 MODULES.parrilla = async (content) => {
   const club = currentClub();
   if (!club) { content.innerHTML = '<p class="muted">Selecciona un club.</p>'; return; }
   let day = DIAS[0];
+  let weekMonday = mondayOf(new Date());
 
   content.innerHTML = `
-    <div class="content-header"><h1>Parrilla — ${esc(club.name)}</h1></div>
+    <div class="content-header">
+      <h1>Parrilla — ${esc(club.name)}</h1>
+      <div>
+        <button class="btn small secondary" id="week-prev">&larr; Semana</button>
+        <span class="muted" id="week-label" style="margin:0 6px"></span>
+        <button class="btn small secondary" id="week-next">Semana &rarr;</button>
+        <button class="btn small" id="sync-playtomic">Sincronizar con Playtomic</button>
+      </div>
+    </div>
+    <div class="tip">Las clases con el distintivo 🔗 vienen sincronizadas de Playtomic (fecha real, con sus participantes) — las demás son plantilla manual recurrente, se repiten cada semana.</div>
     <div class="tabs" id="day-tabs">${DIAS.map((d, i) => `<button class="${i===0?'active':''}" data-d="${d}">${DIAS_LABEL[d]}</button>`).join('')}</div>
     <div id="parrilla-body"></div>
   `;
-  qsa('#day-tabs button').forEach((b) => b.onclick = () => { day = b.dataset.d; qsa('#day-tabs button').forEach(x=>x.classList.remove('active')); b.classList.add('active'); renderDay(); });
+  qsa('#day-tabs button').forEach((b, i) => b.onclick = () => { day = b.dataset.d; qsa('#day-tabs button').forEach(x=>x.classList.remove('active')); b.classList.add('active'); renderDay(); });
+  qs('#week-prev').onclick = () => { weekMonday.setDate(weekMonday.getDate() - 7); renderDay(); };
+  qs('#week-next').onclick = () => { weekMonday.setDate(weekMonday.getDate() + 7); renderDay(); };
+  qs('#sync-playtomic').onclick = () => syncPlaytomicWeek();
+
+  function dateForDay(d) {
+    const idx = DIAS.indexOf(d);
+    const dt = new Date(weekMonday); dt.setDate(dt.getDate() + idx);
+    return dt;
+  }
 
   async function loadData() {
+    const weekStartISO = isoDate(weekMonday);
+    const weekEnd = new Date(weekMonday); weekEnd.setDate(weekEnd.getDate() + 6);
+    const weekEndISO = isoDate(weekEnd);
     const [{ data: classes }, students, classTypes, trainersAll] = await Promise.all([
-      supabase.from('classes').select('*, class_students(student_id, students(id, name, level, birthdate))').eq('club_id', club.id),
+      supabase.from('classes').select('*, class_students(student_id, students(id, name, level, birthdate))')
+        .eq('club_id', club.id)
+        .or(`date.is.null,and(date.gte.${weekStartISO},date.lte.${weekEndISO})`),
       fetchStudentsView(club.id),
       supabase.from('class_types').select('*').eq('club_id', club.id).then(r => r.data || []),
-      supabase.from('classes').select('trainer_id, day, hour, club_id'), // para detectar dobles clases del mismo profesor en cualquier club
+      supabase.from('classes').select('trainer_id, day, hour, club_id, date'), // para detectar dobles clases del mismo profesor en cualquier club
     ]);
     return { classes: classes || [], students, classTypes, trainersAll: trainersAll || [] };
   }
 
   async function renderDay() {
+    const weekEnd = new Date(weekMonday); weekEnd.setDate(weekEnd.getDate() + 6);
+    qs('#week-label').textContent = `${fmtDate(isoDate(weekMonday))} – ${fmtDate(isoDate(weekEnd))}`;
     const body = qs('#parrilla-body');
     body.innerHTML = '<p class="muted">Cargando…</p>';
     const { classes, students, classTypes, trainersAll } = await loadData();
-    const byHour = {};
-    classes.filter((c) => c.day === day).forEach((c) => (byHour[c.hour] ??= []).push(c));
+    const thisDate = isoDate(dateForDay(day));
+    const dayClasses = classes.filter((c) => (c.date ? c.date === thisDate : c.day === day));
 
-    body.innerHTML = HOURS.map((h) => {
+    const byHour = {};
+    dayClasses.forEach((c) => (byHour[c.hour] ??= []).push(c));
+    const allHours = [...new Set([...HOURS, ...Object.keys(byHour)])].sort();
+
+    body.innerHTML = allHours.map((h) => {
       const items = (byHour[h] || []).map((c) => renderClassCard(c, trainersAll)).join('');
       return `<div class="card" style="margin-bottom:8px"><div class="row" style="align-items:center">
         <div style="flex:0 0 60px;font-weight:700">${h}</div>
@@ -745,52 +785,58 @@ MODULES.parrilla = async (content) => {
     const trainer = state.trainers.find((t) => t.id === c.trainer_id);
     const assigned = c.class_students || [];
     const warnings = [];
-    if (assigned.length < c.capacity) warnings.push(`${c.capacity - assigned.length} plaza(s) libre(s)`);
+    if (c.source !== 'playtomic' && assigned.length < c.capacity) warnings.push(`${c.capacity - assigned.length} plaza(s) libre(s)`);
     if (trainer && !trainerAvailableAt(trainer, day, c.hour)) warnings.push('Entrenador fuera de disponibilidad');
-    const doubleBooked = trainer && trainersAll.filter((x) => x.trainer_id === c.trainer_id && x.day === day && x.hour === c.hour).length > 1;
+    const doubleBooked = trainer && trainersAll.filter((x) => x.trainer_id === c.trainer_id && (x.date ? x.date === c.date : x.day === day) && x.hour === c.hour).length > 1;
     if (doubleBooked) warnings.push('Entrenador con otra clase a la misma hora');
 
+    const count = c.source === 'playtomic' ? (c.participant_names || []).length : assigned.length;
     const levels = assigned.map((a) => a.students?.level).filter((n) => n != null);
     const avgLevel = levels.length ? (levels.reduce((a, b) => a + b, 0) / levels.length).toFixed(1) : '-';
     const brackets = new Set(assigned.map((a) => ageBracket(a.students?.birthdate)).filter(Boolean));
     const bracket = brackets.size === 1 ? [...brackets][0] : (brackets.size > 1 ? 'mixto' : '-');
 
     return `<div class="cls cls-card ${warnings.length ? 'warn-slot' : ''}" data-id="${c.id}" style="background:${trainer?.color || 'var(--court)'}" title="${warnings.join(' · ')}">
-      ${esc(c.type)} · pista ${c.court ?? '?'}<br/>${trainer ? esc(trainer.name) : 'Sin entrenador'}<br/>
-      ${assigned.length}/${c.capacity} · nivel ${avgLevel} · ${bracket}
+      ${c.source === 'playtomic' ? '🔗 ' : ''}${esc(c.type)} · pista ${c.court ?? '?'}<br/>${trainer ? esc(trainer.name) : 'Sin entrenador'}<br/>
+      ${count}/${c.capacity}${c.source !== 'playtomic' ? ` · nivel ${avgLevel} · ${bracket}` : ''}
       ${warnings.length ? ` ⚠️` : ''}
     </div>`;
   }
 
   function openClassForm(cls, hour, classTypes, students) {
+    const isSynced = cls?.source === 'playtomic';
     const allowedTypes = classTypes.filter((t) => hour < club.serious_cutoff_hour ? true : t.serio);
     const modal = openModal(cls ? 'Editar clase' : 'Nueva clase', `
+      ${isSynced ? `<div class="tip">🔗 Clase sincronizada desde Playtomic (${esc(cls.date ? fmtDate(cls.date) : '')}). Los participantes vienen de Playtomic y no se pueden editar aquí; el resto de campos sí.</div>` : ''}
       <div class="row">
         <div class="field"><label>Hora</label><input value="${hour}" disabled /></div>
         <div class="field"><label>Pista</label><input type="number" id="f-court" min="1" max="${club.num_courts}" value="${cls?.court ?? ''}" /></div>
       </div>
       <div class="row">
-        <div class="field"><label>Tipo</label><select id="f-type">${allowedTypes.map((t) => `<option ${cls?.type===t.name?'selected':''}>${esc(t.name)}</option>`).join('')}</select></div>
+        <div class="field"><label>Tipo</label>${isSynced
+          ? `<input value="${esc(cls.type)}" disabled />`
+          : `<select id="f-type">${allowedTypes.map((t) => `<option ${cls?.type===t.name?'selected':''}>${esc(t.name)}</option>`).join('')}</select>`}</div>
         <div class="field"><label>Capacidad</label><input type="number" id="f-cap" value="${cls?.capacity ?? 4}" /></div>
       </div>
       <div class="field"><label>Entrenador</label><select id="f-trainer"><option value="">-</option>${state.trainers.filter(t=>t.clubs.includes(club.id)).map((t) => `<option value="${t.id}" ${cls?.trainer_id===t.id?'selected':''}>${esc(t.name)}</option>`).join('')}</select></div>
-      ${cls ? `<div class="field"><label>Alumnos asignados</label><div id="f-students"></div></div>` : ''}
+      ${cls && !isSynced ? `<div class="field"><label>Alumnos asignados</label><div id="f-students"></div></div>` : ''}
+      ${isSynced ? `<div class="field"><label>Participantes (Playtomic)</label><div>${(cls.participant_names || []).map((n) => `<span class="pill activo" style="margin:2px">${esc(n)}</span>`).join('') || '<span class="muted">Sin participantes.</span>'}</div></div>` : ''}
       <div class="row">
         <button class="btn" id="f-save">Guardar</button>
         ${cls ? '<button class="btn danger" id="f-del">Eliminar clase</button>' : ''}
       </div>
     `, { wide: !!cls });
 
-    if (cls) renderStudentAssign(modal, cls, students);
+    if (cls && !isSynced) renderStudentAssign(modal, cls, students);
 
     qs('#f-save', modal).onclick = async () => {
       const payload = {
         club_id: club.id, day, hour,
         court: qs('#f-court', modal).value ? Number(qs('#f-court', modal).value) : null,
-        type: qs('#f-type', modal).value,
         capacity: Number(qs('#f-cap', modal).value) || 4,
         trainer_id: qs('#f-trainer', modal).value || null,
       };
+      if (!isSynced) payload.type = qs('#f-type', modal).value;
       const { error } = cls
         ? await supabase.from('classes').update(payload).eq('id', cls.id)
         : await supabase.from('classes').insert(payload);
@@ -798,7 +844,7 @@ MODULES.parrilla = async (content) => {
       modal.remove(); toast('Clase guardada.'); renderDay();
     };
     if (cls) qs('#f-del', modal).onclick = async () => {
-      if (!confirm('¿Eliminar esta clase? Los alumnos asignados pasarán a lista de espera.')) return;
+      if (!confirm(isSynced ? '¿Eliminar esta clase de nuestra Parrilla? Volverá a aparecer si sigue activa en Playtomic la próxima vez que sincronices.' : '¿Eliminar esta clase? Los alumnos asignados pasarán a lista de espera.')) return;
       const { error } = await supabase.from('classes').delete().eq('id', cls.id);
       if (error) return toast(error.message, true);
       modal.remove(); toast('Clase eliminada.'); renderDay();
@@ -828,6 +874,52 @@ MODULES.parrilla = async (content) => {
       cls.class_students = cls.class_students.filter((cs) => cs.student_id !== b.dataset.id);
       renderStudentAssign(modal, cls, students);
     });
+  }
+
+  async function syncPlaytomicWeek() {
+    const btn = qs('#sync-playtomic');
+    btn.disabled = true; btn.textContent = 'Sincronizando…';
+    try {
+      const weekEnd = new Date(weekMonday); weekEnd.setDate(weekEnd.getDate() + 6);
+      const raw = await fetchPlaytomicBookings(isoDate(weekMonday), isoDate(weekEnd));
+      const valid = raw.filter(isPlaytomicClassBooking);
+
+      for (const b of valid) {
+        const dayOfWeek = DIAS[(new Date(b.date + 'T00:00:00').getDay() + 6) % 7];
+        const trainer = state.trainers.find((t) => t.playtomic_coach_id && b.coach_ids?.includes(t.playtomic_coach_id));
+        const payload = {
+          club_id: club.id,
+          date: b.date,
+          day: dayOfWeek,
+          hour: b.start,
+          type: b.booking_type === 'COURSE_CLASS' ? 'Curso (Playtomic)' : 'Particular (Playtomic)',
+          capacity: Math.max(b.participants || 1, 1),
+          court: extractCourtNumber(b.court),
+          trainer_id: trainer?.id ?? null,
+          playtomic_booking_id: b.id,
+          source: 'playtomic',
+          participant_names: b.participant_names || [],
+        };
+        const { error } = await supabase.from('classes').upsert(payload, { onConflict: 'playtomic_booking_id' });
+        if (error) console.warn('Sync clase Playtomic falló:', b.id, error.message);
+      }
+
+      // Las que ya no están activas en Playtomic (canceladas/movidas) se
+      // quitan de nuestra Parrilla para esta semana.
+      const validIds = valid.map((b) => b.id);
+      let delQuery = supabase.from('classes').delete()
+        .eq('club_id', club.id).eq('source', 'playtomic')
+        .gte('date', isoDate(weekMonday)).lte('date', isoDate(weekEnd));
+      delQuery = validIds.length ? delQuery.not('playtomic_booking_id', 'in', `(${validIds.join(',')})`) : delQuery;
+      await delQuery;
+
+      toast(`Sincronizado: ${valid.length} clases de Playtomic para esta semana.`);
+      renderDay();
+    } catch (err) {
+      toast('Fallo al sincronizar con Playtomic: ' + err.message, true);
+    } finally {
+      btn.disabled = false; btn.textContent = 'Sincronizar con Playtomic';
+    }
   }
 
   renderDay();
@@ -1857,13 +1949,12 @@ MODULES.playtomic = async (content) => {
           : `<p class="muted">Sin clases de academia/particulares en ese rango. Si sabes que sí había clases, marca "Mostrar todos los tipos" y mira qué valor aparece en la columna Tipo — puede que tu cuenta use otro nombre distinto de "${PLAYTOMIC_CLASS_TYPES.join('"/"')}".</p>`;
         return;
       }
-      body.innerHTML = `<table><thead><tr><th>Fecha</th><th>Hora</th><th>Tipo</th><th>Pista</th><th>coach_ids (Playtomic)</th><th>Casa con</th><th>Pago</th><th>Jugadores</th><th>Participantes (crudo)</th></tr></thead>
+      body.innerHTML = `<table><thead><tr><th>Fecha</th><th>Hora</th><th>Tipo</th><th>Pista</th><th>coach_ids (Playtomic)</th><th>Casa con</th><th>Pago</th><th>Participantes</th></tr></thead>
         <tbody>${bookings.map((b) => {
           const matched = state.trainers.find((t) => matchPlaytomicTrainer(b, t));
           return `<tr><td>${b.date || '-'}</td><td>${b.start || '-'} - ${b.end || '-'}</td><td>${esc(b.booking_type || '-')}</td><td>${esc(b.court || '-')}</td>
             <td>${esc((b.coach_ids || []).join(', ') || '-')}</td><td>${matched ? '✅ ' + esc(matched.name) : '<span class="muted">sin casar</span>'}</td>
-            <td>${esc(b.payment_status || '-')}</td><td>${b.participants ?? '-'}</td>
-            <td><code style="font-size:11px;white-space:pre-wrap;word-break:break-all">${esc(JSON.stringify(b.participants_raw))}</code></td></tr>`;
+            <td>${esc(b.payment_status || '-')}</td><td>${(b.participant_names || []).map(esc).join(', ') || '-'}</td></tr>`;
         }).join('')}</tbody></table>`;
     } catch (err) {
       body.innerHTML = `<div class="warn">No se pudo conectar con Playtomic: ${esc(err.message)}.

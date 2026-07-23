@@ -185,9 +185,9 @@ Deno.serve(async (req) => {
         coach_ids: b.coach_ids ?? [],
         payment_status: b.payment_status ?? null,
         participants: b.participant_info?.participants?.length ?? null,
-        // TEMPORAL: crudo de participant_info para comprobar si trae
-        // nombres/emails o solo IDs. Quitar en cuanto lo confirmemos.
-        participants_raw: b.participant_info ?? null,
+        // Confirmado contra la cuenta real: sí trae nombre (y email) de
+        // cada participante, no solo el conteo.
+        participant_names: (b.participant_info?.participants ?? []).map((p: any) => p.name).filter(Boolean),
       };
     });
 

@@ -209,6 +209,15 @@ const EVENTOS_PROVEEDOR_EMAIL = window.EVENTOS_PROVEEDOR_EMAIL || '';
 const CATEGORIA_COLORS = {
   'Torneo externo': '#7a4fb5', 'Alquiler empresa': '#2f6f4f', 'Actividad puntual': '#d98c3a', 'Otro': '#66756f',
 };
+// Playtomic devuelve en el mismo feed partidos entre socios, clases y
+// torneos mezclados (campo booking_type). Para KPIs solo cuentan clases y
+// clases particulares — ajusta esta lista si tu cuenta usa otros valores
+// (compruébalo con el interruptor "mostrar todos los tipos" en Playtomic
+// Manager, que enseña el valor real de cada reserva).
+const PLAYTOMIC_CLASS_TYPES = ['class', 'lesson'];
+function isPlaytomicClassBooking(b) {
+  return PLAYTOMIC_CLASS_TYPES.includes(String(b.booking_type ?? '').toLowerCase());
+}
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const FN_URL = `${SUPABASE_URL}/functions/v1`;
@@ -1353,7 +1362,7 @@ MODULES.kpis = async (content) => {
     try {
       const from = `${monthKey}-01`;
       const toDate = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0);
-      bookings = await fetchPlaytomicBookings(from, toDate.toISOString().slice(0, 10));
+      bookings = (await fetchPlaytomicBookings(from, toDate.toISOString().slice(0, 10))).filter(isPlaytomicClassBooking);
     } catch (err) {
       console.warn('Playtomic no disponible, se estima desde el horario interno:', err.message);
     }
@@ -1806,12 +1815,13 @@ MODULES.playtomic = async (content) => {
   const club = currentClub();
   content.innerHTML = `
     <div class="content-header"><h1>Playtomic Manager</h1></div>
-    <div class="tip">Panel de solo lectura para depurar la integración. No escribe nada en Playtomic ni guarda copia de las reservas. Solo se muestran clases de academia y clases particulares — los partidos entre socios y los torneos se descartan automáticamente en la Edge Function.</div>
+    <div class="tip">Panel de solo lectura para depurar la integración. No escribe nada en Playtomic ni guarda copia de las reservas. Por defecto solo se muestran clases de academia y clases particulares (tipos "${PLAYTOMIC_CLASS_TYPES.join('", "')}") — activa el interruptor de abajo para ver todos los tipos sin filtrar y comprobar qué valor usa realmente tu cuenta.</div>
     <div class="row">
       <div class="field"><label>Desde</label><input type="date" id="pt-from" value="${todayISO()}" /></div>
       <div class="field"><label>Hasta</label><input type="date" id="pt-to" value="${todayISO()}" /></div>
       <div class="field" style="align-self:flex-end"><button class="btn" id="pt-load">Consultar</button></div>
     </div>
+    <div class="field"><label style="font-weight:400"><input type="checkbox" id="pt-show-all" style="width:auto" /> Mostrar todos los tipos (depuración, incluye partidos y torneos)</label></div>
     <div id="pt-body"></div>
   `;
   qs('#pt-load').onclick = load;
@@ -1820,8 +1830,15 @@ MODULES.playtomic = async (content) => {
     const body = qs('#pt-body');
     body.innerHTML = '<p class="muted">Consultando Playtomic…</p>';
     try {
-      const bookings = await fetchPlaytomicBookings(qs('#pt-from').value, qs('#pt-to').value);
-      if (!bookings.length) { body.innerHTML = '<p class="muted">Sin clases de academia/particulares en ese rango (los partidos y torneos no se cuentan).</p>'; return; }
+      const showAll = qs('#pt-show-all').checked;
+      const raw = await fetchPlaytomicBookings(qs('#pt-from').value, qs('#pt-to').value);
+      const bookings = showAll ? raw : raw.filter(isPlaytomicClassBooking);
+      if (!bookings.length) {
+        body.innerHTML = showAll
+          ? '<p class="muted">Sin ninguna reserva en ese rango.</p>'
+          : `<p class="muted">Sin clases de academia/particulares en ese rango. Si sabes que sí había clases, marca "Mostrar todos los tipos" y mira qué valor aparece en la columna Tipo — puede que tu cuenta use otro nombre distinto de "${PLAYTOMIC_CLASS_TYPES.join('"/"')}".</p>`;
+        return;
+      }
       body.innerHTML = `<table><thead><tr><th>Fecha</th><th>Hora</th><th>Tipo</th><th>Pista</th><th>Entrenador (Playtomic)</th><th>Casa con</th><th>Pago</th><th>Jugadores</th></tr></thead>
         <tbody>${bookings.map((b) => {
           const matched = state.trainers.find((t) => t.external_system_name && t.external_system_name.trim().toLowerCase() === (b.trainer_name || '').trim().toLowerCase());

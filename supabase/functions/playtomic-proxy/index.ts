@@ -185,9 +185,12 @@ Deno.serve(async (req) => {
         coach_ids: b.coach_ids ?? [],
         payment_status: b.payment_status ?? null,
         participants: b.participant_info?.participants?.length ?? null,
-        // Confirmado contra la cuenta real: sí trae nombre (y email) de
-        // cada participante, no solo el conteo.
-        participant_names: (b.participant_info?.participants ?? []).map((p: any) => p.name).filter(Boolean),
+        // Confirmado contra la cuenta real: sí trae nombre y email de cada
+        // participante, no solo el conteo — se usa para dar de alta al
+        // alumno automáticamente si no existe ya en el CRM.
+        participants_detail: (b.participant_info?.participants ?? [])
+          .map((p: any) => ({ name: p.name ?? null, email: p.email ?? null }))
+          .filter((p: any) => p.name),
       };
     });
 

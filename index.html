@@ -797,7 +797,6 @@ MODULES.parrilla = async (content) => {
     const doubleBooked = trainer && trainersAll.filter((x) => x.trainer_id === c.trainer_id && (x.date ? x.date === c.date : x.day === day) && x.hour === c.hour).length > 1;
     if (doubleBooked) warnings.push('Entrenador con otra clase a la misma hora');
 
-    const count = c.source === 'playtomic' ? (c.participant_names || []).length : assigned.length;
     const levels = assigned.map((a) => a.students?.level).filter((n) => n != null);
     const avgLevel = levels.length ? (levels.reduce((a, b) => a + b, 0) / levels.length).toFixed(1) : '-';
     const brackets = new Set(assigned.map((a) => ageBracket(a.students?.birthdate)).filter(Boolean));
@@ -805,7 +804,7 @@ MODULES.parrilla = async (content) => {
 
     return `<div class="cls cls-card ${warnings.length ? 'warn-slot' : ''}" data-id="${c.id}" style="background:${trainer?.color || 'var(--court)'}" title="${warnings.join(' · ')}">
       ${c.source === 'playtomic' ? '🔗 ' : ''}${esc(c.type)} · pista ${c.court ?? '?'}<br/>${trainer ? esc(trainer.name) : 'Sin entrenador'}<br/>
-      ${count}/${c.capacity}${c.source !== 'playtomic' ? ` · nivel ${avgLevel} · ${bracket}` : ''}
+      ${assigned.length}/${c.capacity} · nivel ${avgLevel} · ${bracket}
       ${warnings.length ? ` ⚠️` : ''}
     </div>`;
   }
@@ -827,7 +826,7 @@ MODULES.parrilla = async (content) => {
       </div>
       <div class="field"><label>Entrenador</label><select id="f-trainer"><option value="">-</option>${state.trainers.filter(t=>t.clubs.includes(club.id)).map((t) => `<option value="${t.id}" ${cls?.trainer_id===t.id?'selected':''}>${esc(t.name)}</option>`).join('')}</select></div>
       ${cls && !isSynced ? `<div class="field"><label>Alumnos asignados</label><div id="f-students"></div></div>` : ''}
-      ${isSynced ? `<div class="field"><label>Participantes (Playtomic)</label><div>${(cls.participant_names || []).map((n) => `<span class="pill activo" style="margin:2px">${esc(n)}</span>`).join('') || '<span class="muted">Sin participantes.</span>'}</div></div>` : ''}
+      ${cls && isSynced ? `<div class="field"><label>Alumnos (matriculados en Playtomic — de solo lectura)</label><div>${(cls.class_students || []).map((cs) => `<span class="pill activo" style="margin:2px">${esc(cs.students?.name || '?')}</span>`).join('') || '<span class="muted">Sin alumnos.</span>'}</div></div>` : ''}
       <div class="row">
         <button class="btn" id="f-save">Guardar</button>
         ${cls ? '<button class="btn danger" id="f-del">Eliminar clase</button>' : ''}
@@ -891,6 +890,33 @@ MODULES.parrilla = async (content) => {
       const raw = await fetchPlaytomicBookings(isoDate(weekMonday), isoDate(weekEnd));
       const valid = raw.filter(isPlaytomicClassBooking);
 
+      // Dar de alta automáticamente a los alumnos nuevos que aparezcan como
+      // participantes de una clase de Playtomic (por email si lo hay, si no
+      // por nombre exacto, para no duplicar a quien ya está en el CRM).
+      const existing = await fetchStudentsView(club.id);
+      const byEmail = new Map(existing.filter((s) => s.email).map((s) => [s.email.trim().toLowerCase(), s.id]));
+      const byName = new Map(existing.map((s) => [s.name.trim().toLowerCase(), s.id]));
+
+      const allParticipants = valid.flatMap((b) => b.participants_detail || []);
+      const toCreate = new Map(); // key -> {name, email}
+      allParticipants.forEach((p) => {
+        const key = (p.email || p.name).trim().toLowerCase();
+        const alreadyExists = (p.email && byEmail.has(p.email.trim().toLowerCase())) || byName.has(p.name.trim().toLowerCase());
+        if (!alreadyExists && !toCreate.has(key)) toCreate.set(key, { name: p.name, email: p.email, club_id: club.id, status: 'activo' });
+      });
+
+      if (toCreate.size) {
+        const { data: created, error: createErr } = await supabase.from('students').insert([...toCreate.values()]).select();
+        if (createErr) console.warn('Alta automática de alumnos falló:', createErr.message);
+        (created || []).forEach((s) => { if (s.email) byEmail.set(s.email.trim().toLowerCase(), s.id); byName.set(s.name.trim().toLowerCase(), s.id); });
+      }
+
+      function resolveStudentId(p) {
+        if (p.email && byEmail.has(p.email.trim().toLowerCase())) return byEmail.get(p.email.trim().toLowerCase());
+        return byName.get(p.name.trim().toLowerCase()) ?? null;
+      }
+
+      const linkRows = [];
       for (const b of valid) {
         const dayOfWeek = DIAS[(new Date(b.date + 'T00:00:00').getDay() + 6) % 7];
         const trainer = state.trainers.find((t) => t.playtomic_coach_id && b.coach_ids?.includes(t.playtomic_coach_id));
@@ -905,10 +931,17 @@ MODULES.parrilla = async (content) => {
           trainer_id: trainer?.id ?? null,
           playtomic_booking_id: b.id,
           source: 'playtomic',
-          participant_names: b.participant_names || [],
         };
-        const { error } = await supabase.from('classes').upsert(payload, { onConflict: 'playtomic_booking_id' });
-        if (error) console.warn('Sync clase Playtomic falló:', b.id, error.message);
+        const { data: savedClass, error } = await supabase.from('classes').upsert(payload, { onConflict: 'playtomic_booking_id' }).select().single();
+        if (error) { console.warn('Sync clase Playtomic falló:', b.id, error.message); continue; }
+        (b.participants_detail || []).forEach((p) => {
+          const studentId = resolveStudentId(p);
+          if (studentId) linkRows.push({ class_id: savedClass.id, student_id: studentId });
+        });
+      }
+      if (linkRows.length) {
+        const { error: linkErr } = await supabase.from('class_students').upsert(linkRows, { onConflict: 'class_id,student_id' });
+        if (linkErr) console.warn('Enlace alumno-clase falló:', linkErr.message);
       }
 
       // Las que ya no están activas en Playtomic (canceladas/movidas) se
@@ -920,7 +953,7 @@ MODULES.parrilla = async (content) => {
       delQuery = validIds.length ? delQuery.not('playtomic_booking_id', 'in', `(${validIds.join(',')})`) : delQuery;
       await delQuery;
 
-      toast(`Sincronizado: ${valid.length} clases de Playtomic para esta semana.`);
+      toast(`Sincronizado: ${valid.length} clases, ${toCreate.size} alumnos nuevos dados de alta.`);
       renderDay();
     } catch (err) {
       toast('Fallo al sincronizar con Playtomic: ' + err.message, true);

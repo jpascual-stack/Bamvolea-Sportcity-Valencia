@@ -18,6 +18,12 @@ se pueden añadir más adelante siguiendo el mismo patrón de módulos.
    - `0001_init.sql` — esquema, RLS y bucket de adjuntos.
    - `0002_rpc_and_seed.sql` — tipos de clase, plantillas base y las
      funciones RPC de la Vista entrenador (acceso por PIN).
+   - `0003` a `0005` — Playtomic (IDs de profesor, sincronización de clases)
+     y alta de entrenadores.
+   - `0006_event_quotes.sql` — Presupuestos de eventos: tarifas
+     (`quote_catalog`), presupuestos (`event_quotes`), plantilla de email
+     `presupuesto_evento` y los tres últimos presupuestos enviados
+     (GRUPPE, Power Electronics, CECOTEC) como historial.
 3. En **Authentication > Users**, crea una cuenta para cada persona del
    equipo (email + contraseña).
 4. En **Table Editor > profiles**, da de alta una fila por cada usuario:
@@ -73,6 +79,10 @@ antes de confiar del todo en los datos, porque:
 - La API solo conserva reservas de los últimos ~3 meses.
 Nunca pongáis `PLAYTOMIC_CLIENT_ID`/`SECRET` en el frontend.
 
+> Si ya tenías `send-email` desplegada, vuelve a pegar su `index.ts`
+> actualizado: antes fallaba con adjuntos de más de ~100 KB (como el PDF de
+> un presupuesto) y ahora los codifica por trozos.
+
 ## 3. Configurar el frontend
 
 Edita las primeras líneas de `index.html` (o defínelas antes de cargar el
@@ -120,6 +130,28 @@ desde el móvil — el resto del equipo entra siempre con su cuenta real.
 - [ ] Si vais a usar Playtomic: credenciales configuradas y endpoint
       verificado contra una respuesta real antes de confiar en los KPIs
       "reales".
+
+## Presupuestos de eventos (Eventos > Presupuestos)
+
+Sustituye al Excel "DESGLOSE EVENTO" y al Word del presupuesto:
+
+1. **Nuevo presupuesto** → empresa, fecha y nº de participantes (el título
+   "EVENTO DEPORTIVO EMPRESA" y el texto de la fecha se rellenan solos).
+2. **Plantilla rápida** (torneo, alquiler, clinic, pádel + fútbol 7, evento
+   familiar) y ajustar el desglose: pistas × horas × €/h, bolas, gestión del
+   torneo, monitores, ludoteca… Escribiendo el horario ("de 9:30 a 14:30")
+   se calculan las horas; los botes de bolas siguen al nº de pistas.
+3. Las viñetas del PDF se generan solas desde el desglose (se pueden
+   retocar a mano) y la vista previa se actualiza al momento.
+4. **Descargar PDF**, **Imprimir** (PDF vectorial vía "Guardar como PDF") o
+   **Enviar por email** con el PDF adjunto (marca el presupuesto como
+   enviado). **Aceptado → calendario** crea el evento en el calendario.
+5. **Duplicar** reutiliza cualquier presupuesto anterior; **Tarifas**
+   (admin, coordinación, dirección) cambia precios por defecto y textos.
+
+El diseño del PDF usa las imágenes de `assets/presupuestos/` (cabecera,
+logo e icono de calendario) y la dirección del club definida en
+`QUOTE_CLUB_ADDRESS` dentro de `index.html`.
 
 ## Qué añadir después
 

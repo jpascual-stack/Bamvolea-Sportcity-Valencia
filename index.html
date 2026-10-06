@@ -126,6 +126,25 @@
   .tabs button { background: #fff; border: 1px solid var(--border); padding: 6px 14px; border-radius: 999px; font-size: 13px; }
   .tabs button.active { background: var(--court); color: #fff; border-color: var(--court); }
 
+  /* Presupuestos de eventos */
+  .q-actions { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  .q-editor { display: grid; grid-template-columns: minmax(0, 1fr) 430px; gap: 18px; align-items: start; }
+  .q-form > .card { margin-bottom: 14px; }
+  .q-preview-col { position: sticky; top: 0; }
+  .q-preview { position: relative; width: 100%; aspect-ratio: 794 / 1122; overflow: hidden; border: 1px solid var(--border); border-radius: 6px; box-shadow: var(--shadow); background: #fff; }
+  .q-preview .qsheet { position: absolute; top: 0; left: 0; transform-origin: 0 0; }
+  .q-presets { font-size: 12px; color: var(--text-muted); display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }
+  table.q-lines th, table.q-lines td { padding: 6px 5px; vertical-align: top; }
+  table.q-lines input, table.q-lines textarea { padding: 5px 7px; font-size: 13px; }
+  table.q-sum { max-width: 420px; margin-left: auto; }
+  table.q-sum td { padding: 4px 8px; }
+  table.q-sum td:last-child { text-align: right; white-space: nowrap; }
+  table.q-sum .q-sum-total td { font-weight: 700; font-size: 17px; color: var(--court-dark); border-bottom: none; }
+  @media (max-width: 1150px) {
+    .q-editor { grid-template-columns: 1fr; }
+    .q-preview-col { position: static; max-width: 520px; }
+  }
+
   @media (max-width: 780px) {
     #app.active { flex-direction: column; }
     #sidebar { width: 100%; }
@@ -368,6 +387,7 @@ const NAV = [
   ]},
   { key: 'eventos', title: 'Eventos', roles: ['admin','coordinacion','direccion','front_desk'], items: [
     { key: 'eventos', label: 'Calendario de eventos' },
+    { key: 'presupuestos', label: 'Presupuestos' },
   ]},
   { key: 'gestion', title: 'Gestión', roles: ['admin','direccion','administracion'], items: [
     { key: 'plantillas', label: 'Plantillas de email' },
@@ -561,6 +581,11 @@ MODULES.guia = async (content) => {
     </div>
     <div class="card"><h2>Eventos</h2>
       <p>El calendario de Eventos (alquileres, torneos externos, empresas) se ve siempre completo con todos los clubs a la vez, para poder cuadrar pistas compartidas entre sedes.</p>
+    </div>
+    <div class="card"><h2>Eventos &gt; Presupuestos</h2>
+      <p>Sustituye al Excel de desglose y al Word del presupuesto. Elige una plantilla rápida (torneo, alquiler, clinic…), ajusta pistas, horario y precio por hora, y el total y las viñetas del PDF salen solos con el diseño de siempre.</p>
+      <div class="tip">Desde el propio presupuesto puedes descargar el PDF, enviarlo por email con el PDF adjunto y, cuando el cliente acepta, pasarlo al calendario de Eventos con un clic.</div>
+      <div class="tip">"Duplicar" crea uno nuevo a partir de otro ya hecho: lo más rápido para clientes que repiten. Los precios por defecto se cambian en Presupuestos &gt; Tarifas.</div>
     </div>
   `;
 };
@@ -1914,6 +1939,955 @@ MODULES.eventos = async (content) => {
       }
       toast(`Enviado a ${recipients.length} contactos.`);
       modal.remove();
+    };
+  }
+};
+
+// ---------- EVENTOS: PRESUPUESTOS ----------
+// Sustituye el Excel "DESGLOSE EVENTO" + el Word que se pasaba a PDF: el
+// desglose interno (pistas x horas x precio, bolas, gestión del torneo...)
+// calcula el total y genera solas las viñetas que ve el cliente, con el
+// mismo diseño del PDF de siempre.
+const QUOTE_ASSETS = 'assets/presupuestos/';
+const QUOTE_CLUB_ADDRESS = 'C/ Del Polideportivo, 2,<br/>46470 Massanassa, Valencia';
+const QUOTE_STATUS = {
+  borrador: { label: 'Borrador', color: '#66756f' },
+  enviado: { label: 'Enviado', color: '#2b67ed' },
+  aceptado: { label: 'Aceptado', color: '#2f6f4f' },
+  rechazado: { label: 'Rechazado', color: '#b3413a' },
+};
+const QUOTE_CATEGORY_LABEL = {
+  pistas: 'Pistas', material: 'Material', personal: 'Personal y gestión', actividades: 'Actividades',
+  catering: 'Catering', premios: 'Premios', otros: 'Otros',
+};
+const QUOTE_UNIT_LABEL = {
+  pista_hora: 'pistas × horas × €/h', hora: 'cantidad × horas × €/h', unidad: 'cantidad × €', persona: 'personas × €', fijo: 'importe fijo',
+};
+const QUOTE_VAT_NOTE = {
+  exento: '*Exención de IVA según el artículo 20.1. 13º de la Ley 37/1992, de 28 de diciembre, del Impuesto sobre el Valor Añadido',
+  mas_iva: '*Precio sin IVA. Se aplicará el 21% de IVA.',
+  iva_incluido: '*IVA incluido.',
+  ninguno: '',
+};
+const QUOTE_PRESETS = [
+  { label: 'Torneo de pádel', items: ['pista_padel_indoor', 'botes_bolas', 'gestion_integral', 'vestuarios'] },
+  { label: 'Alquiler de pistas', items: ['pista_padel_indoor', 'vestuarios'] },
+  { label: 'Clinic con entrenadores', items: ['pista_padel_indoor', 'botes_bolas', 'entrenador_hora', 'vestuarios'] },
+  { label: 'Pádel + fútbol 7', items: ['pista_padel_indoor', 'campo_futbol7', 'vestuarios'] },
+  { label: 'Evento familiar', items: ['pista_padel_indoor', 'botes_bolas', 'gestion_evento', 'ludoteca', 'castillo_hinchable', 'vestuarios'] },
+];
+const QUOTE_PADEL_KEYS = ['pista_padel_indoor', 'pista_padel_outdoor'];
+const QUOTE_CATALOG_ROLES = ['admin', 'coordinacion', 'direccion'];
+
+function round2(n) { return Math.round((Number(n) || 0) * 100) / 100; }
+// es-ES no agrupa los miles en números de 4 cifras ("3731"); de-DE usa el
+// mismo formato que los PDF de siempre ("3.731", "1.199,70").
+function fmtNum(n) { return (Number(n) || 0).toLocaleString('de-DE', { maximumFractionDigits: 2 }); }
+function fmtEur(n) {
+  const v = round2(n);
+  return v.toLocaleString('de-DE', { minimumFractionDigits: Number.isInteger(v) ? 0 : 2, maximumFractionDigits: 2 }) + '€';
+}
+function capitalize(s) { return s ? s[0].toUpperCase() + s.slice(1) : s; }
+function quoteDateLabel(iso) {
+  if (!iso) return '';
+  const d = new Date(iso + 'T00:00:00');
+  return `${capitalize(d.toLocaleDateString('es-ES', { weekday: 'long' }))} ${d.getDate()} ${d.toLocaleDateString('es-ES', { month: 'long' })} ${d.getFullYear()}`;
+}
+function quoteNumber(q) {
+  if (!q.seq) return 'Nuevo';
+  return `P-${(q.created_at || '').slice(0, 4) || new Date().getFullYear()}-${String(q.seq).padStart(3, '0')}`;
+}
+function quoteFileName(q) {
+  const base = String(q.company || 'Evento').normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^A-Za-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+  return `Presupuesto_Evento_${base || 'Evento'}.pdf`;
+}
+// "de 9:30 a 14:30" -> 5; "de 9h a 14h y de 17h a 20h" -> 8. Devuelve null
+// si no reconoce ningún tramo, para no pisar las horas escritas a mano.
+function parseHorarioHours(text) {
+  const re = /(\d{1,2})(?:[:.h](\d{2}))?\s*h?\s*(?:a|-|–|hasta)\s*(\d{1,2})(?:[:.h](\d{2}))?/gi;
+  let total = 0, found = false, m;
+  while ((m = re.exec(String(text || '')))) {
+    const start = Number(m[1]) + Number(m[2] || 0) / 60;
+    const end = Number(m[3]) + Number(m[4] || 0) / 60;
+    if (end > start && end <= 24) { total += end - start; found = true; }
+  }
+  return found ? round2(total) : null;
+}
+function quoteLineAmount(l) {
+  const q = Number(l.qty) || 0, h = Number(l.hours) || 0, p = Number(l.price) || 0;
+  if (l.unit === 'pista_hora' || l.unit === 'hora') return q * h * p;
+  if (l.unit === 'fijo') return p;
+  return q * p;
+}
+function quoteTotals(q) {
+  const subtotal = round2((q.lines || []).reduce((s, l) => s + quoteLineAmount(l), 0));
+  const discount = round2(subtotal * (Number(q.discount_pct) || 0) / 100);
+  const calculated = round2(subtotal - discount);
+  const hasOverride = q.total_override !== null && q.total_override !== undefined && q.total_override !== '';
+  return { subtotal, discount, calculated, total: hasOverride ? round2(q.total_override) : calculated };
+}
+// Nº de pistas de pádel del evento (para los botes de bolas): suma las
+// pistas de pádel de cada día y se queda con el día de más pistas.
+function quotePadelCourts(lines) {
+  const byDay = {};
+  lines.filter((l) => QUOTE_PADEL_KEYS.includes(l.key)).forEach((l) => {
+    const d = (l.day || '').trim();
+    byDay[d] = (byDay[d] || 0) + (Number(l.qty) || 0);
+  });
+  return Math.max(0, ...Object.values(byDay));
+}
+// "de 9h a 14h y de 17h a 20h" -> { start: '09:00', end: '20:00' } (para el calendario).
+function quoteHorarioRange(text) {
+  const re = /(\d{1,2})(?:[:.h](\d{2}))?\s*h?\s*(?:a|-|–|hasta)\s*(\d{1,2})(?:[:.h](\d{2}))?/gi;
+  const ms = [...String(text || '').matchAll(re)];
+  if (!ms.length) return null;
+  const first = ms[0], last = ms[ms.length - 1];
+  return { start: `${first[1].padStart(2, '0')}:${first[2] || '00'}`, end: `${last[3].padStart(2, '0')}:${last[4] || '00'}` };
+}
+
+function fillQuoteText(tpl, l, q) {
+  const n = Number(l.qty) || 0;
+  let s = tpl
+    .replace(/\{n\}/g, fmtNum(n))
+    .replace(/\{horas\}/g, fmtNum(l.hours))
+    .replace(/\{participantes\}/g, q.participants ? String(q.participants) : '…')
+    .replace(/\{descripcion\}/g, String(l.descripcion || l.label || '').trim());
+  if (n === 1) {
+    s = s.replace(/\b1 pistas\b/g, '1 pista').replace(/\b1 palas\b/g, '1 pala')
+      .replace(/\b1 botellas\b/g, '1 botella').replace(/\b1 entrenadores titulados\b/g, '1 entrenador titulado');
+  }
+  return s.trim();
+}
+
+// Genera las viñetas del PDF a partir del desglose: primero las pistas y el
+// horario, luego el resto de conceptos en el orden del catálogo. Los premios
+// van en su propio bloque, como en el PDF de Power Electronics.
+function buildQuoteServices(q, catalogByKey) {
+  const out = [];
+  const push = (s) => { s = String(s || '').trim(); if (s && !out.includes(s)) out.push(s); };
+  const lines = q.lines || [];
+  const catOf = (l) => catalogByKey[l.key]?.category || l.cat || 'otros';
+  const sortOf = (l) => catalogByKey[l.key]?.sort ?? 500;
+  const courts = lines.filter((l) => l.unit === 'pista_hora');
+  const days = [...new Set(courts.map((l) => (l.day || '').trim()))];
+  const multiDay = days.filter(Boolean).length > 1;
+  courts.forEach((l) => {
+    const tpl = catalogByKey[l.key]?.client_text || 'Reserva de {n} pistas para el desarrollo del evento.';
+    tpl.split('\n').forEach((t) => push((multiDay && l.day ? `${l.day.trim()}: ` : '') + fillQuoteText(t, l, q)));
+  });
+  const horariosOf = (ls) => [...new Set(ls.filter((l) => (l.horario || '').trim()).map((l) => l.horario.trim()))];
+  if (multiDay) {
+    days.forEach((d) => {
+      const hs = horariosOf(courts.filter((l) => (l.day || '').trim() === d));
+      if (hs.length) push(`Horario ${d ? d + ': ' : ''}${hs.join(' / ')}`);
+    });
+  } else {
+    const hs = horariosOf(courts);
+    if (hs.length) push(`Horario del evento deportivo: ${hs.join(' / ')}`);
+  }
+  lines.filter((l) => l.unit !== 'pista_hora' && catOf(l) !== 'premios')
+    .map((l, i) => ({ l, i })).sort((a, b) => (sortOf(a.l) - sortOf(b.l)) || (a.i - b.i))
+    .forEach(({ l }) => {
+      const tpl = catalogByKey[l.key]?.client_text ?? '{descripcion}';
+      tpl.split('\n').forEach((t) => { if (t.trim()) push(fillQuoteText(t, l, q)); });
+    });
+  // Como en los PDF de siempre, "Organización de un torneo…" abre la lista.
+  const lead = out.filter((x) => /^organizaci[oó]n\b/i.test(x));
+  out.splice(0, out.length, ...lead, ...out.filter((x) => !lead.includes(x)));
+  const prizes = lines.filter((l) => catOf(l) === 'premios')
+    .map((l) => fillQuoteText(catalogByKey[l.key]?.client_text || '{descripcion}', l, q)).filter(Boolean);
+  return { services: out, prizes_text: prizes.join('\n') };
+}
+
+const QUOTE_SHEET_CSS = `
+  .qsheet { width: 794px; height: 1122px; position: relative; overflow: hidden; background: #fff; color: #111; font-family: Calibri, Carlito, "Segoe UI", Arial, sans-serif; box-sizing: border-box; text-align: left; }
+  .qsheet * { box-sizing: border-box; }
+  .qs-head { height: 200px; position: relative; background-color: #06122b; background-size: cover; background-position: center 62%; color: #fff; }
+  .qs-kicker { position: absolute; left: 44px; top: 26px; font-family: "Arial Black", "Archivo Black", Arial, sans-serif; font-weight: 900; font-size: 40px; line-height: 1.04; letter-spacing: .5px; }
+  .qs-kicker span { display: block; }
+  .qs-kicker .g { color: #00ff00; }
+  .qs-logo { position: absolute; right: 26px; top: 22px; width: 150px; }
+  .qs-title { position: absolute; left: 44px; right: 30px; bottom: 26px; font-family: Arial, Helvetica, sans-serif; font-weight: 700; font-size: 20px; text-transform: uppercase; letter-spacing: .3px; }
+  .qs-body { padding: 48px 66px 0 56px; }
+  .qs-date-row { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin: 16px 0 50px 26px; min-height: 70px; }
+  .qs-date { display: flex; align-items: center; gap: 14px; font-size: 16px; }
+  .qs-date img { width: 58px; height: 58px; }
+  .qs-date b { font-size: 19px; }
+  .qs-client { max-width: 220px; max-height: 80px; object-fit: contain; }
+  .qs-h { font-weight: 700; font-size: 22px; margin: 0 0 28px 4px; }
+  .qs-list { list-style: none; margin: 0; padding: 0 0 0 44px; font-size: 17px; line-height: 1.38; }
+  .qs-list li { position: relative; padding-left: 24px; }
+  .qs-list li::before { content: "\\2713"; position: absolute; left: 0; top: 0; }
+  .qs-prizes { margin-top: 18px; }
+  .qs-prize-text { padding-left: 44px; font-size: 17px; line-height: 1.38; overflow-wrap: anywhere; }
+  .qs-total { font-weight: 700; font-size: 23px; margin: 40px 0 10px 10px; }
+  .qs-total small { display: block; font-size: 15px; font-weight: 400; margin-top: 4px; }
+  .qs-vat { font-size: 13px; margin-left: 10px; line-height: 1.4; max-width: 600px; }
+  .qs-foot { position: absolute; left: 0; right: 0; bottom: 0; height: 140px; background: #2b67ed; color: #fff; display: flex; align-items: center; justify-content: space-between; padding: 0 60px 0 50px; }
+  .qs-foot img { width: 110px; }
+  .qs-foot div { font-family: Arial, Helvetica, sans-serif; font-weight: 700; font-size: 19px; text-align: center; line-height: 1.3; }
+  .qsheet.compact .qs-list, .qsheet.compact .qs-prize-text { font-size: 15px; line-height: 1.3; }
+  .qsheet.compact .qs-date-row { margin-bottom: 30px; }
+  .qsheet.compact .qs-h { margin-bottom: 16px; }
+  .qsheet.compact .qs-total { margin-top: 26px; }
+  .qsheet.xcompact .qs-body { padding-top: 28px; }
+  .qsheet.xcompact .qs-list, .qsheet.xcompact .qs-prize-text { font-size: 13.5px; line-height: 1.22; }
+  .qsheet.xcompact .qs-date-row { margin-bottom: 20px; }
+  .qsheet.xcompact .qs-h { margin-bottom: 10px; font-size: 19px; }
+  .qsheet.xcompact .qs-total { margin-top: 18px; font-size: 20px; }
+`;
+
+function ensureQuoteSheetCss() {
+  if (qs('#qsheet-css')) return;
+  const style = document.createElement('style');
+  style.id = 'qsheet-css';
+  style.textContent = QUOTE_SHEET_CSS;
+  document.head.appendChild(style);
+}
+
+function quoteSheetHtml(q, base = QUOTE_ASSETS) {
+  const t = quoteTotals(q);
+  const services = (q.services || []).map((s) => String(s).trim()).filter(Boolean);
+  const prizes = String(q.prizes_text || '').split('\n').map((s) => s.trim()).filter(Boolean);
+  const density = services.length + prizes.length * 1.5 + (prizes.length ? 1 : 0);
+  const cls = density > 17 ? 'xcompact' : density > 12 ? 'compact' : '';
+  let totalHtml = `Total, evento deportivo: ${fmtEur(t.total)}`;
+  if (q.vat_mode === 'mas_iva') {
+    totalHtml = `Total, evento deportivo: ${fmtEur(t.total)} + IVA<small>IVA (21%): ${fmtEur(t.total * 0.21)} · Total con IVA: ${fmtEur(t.total * 1.21)}</small>`;
+  }
+  const note = QUOTE_VAT_NOTE[q.vat_mode || 'exento'];
+  return `<div class="qsheet ${cls}">
+    <div class="qs-head" style="background-image:url('${base}cabecera.jpg')">
+      <div class="qs-kicker"><span>EVENTO</span><span class="g">DEPORTIVO</span></div>
+      <img class="qs-logo" src="${base}logo-blanco.png" alt="Bamvolea Sportcity" />
+      <div class="qs-title">${esc(q.title || 'EVENTO DEPORTIVO')}</div>
+    </div>
+    <div class="qs-body">
+      <div class="qs-date-row">
+        <div class="qs-date"><img src="${base}calendario.png" alt="" /><b>Fecha</b> <span>${esc(q.date_label || '')}</span></div>
+        ${q.client_logo ? `<img class="qs-client" src="${esc(q.client_logo)}" alt="" />` : ''}
+      </div>
+      <div class="qs-h">Servicios deportivos:</div>
+      <ul class="qs-list">${services.map((s) => `<li>${esc(s)}</li>`).join('')}</ul>
+      ${prizes.length ? `<ul class="qs-list qs-prizes"><li><u>Premios</u></li></ul><div class="qs-prize-text">${prizes.map(esc).join('<br/>')}</div>` : ''}
+      <div class="qs-total">${totalHtml}</div>
+      ${note ? `<div class="qs-vat">${esc(note)}</div>` : ''}
+    </div>
+    <div class="qs-foot"><img src="${base}logo-blanco.png" alt="" /><div>${QUOTE_CLUB_ADDRESS}</div></div>
+  </div>`;
+}
+
+function waitForImages(root) {
+  return Promise.all(qsa('img', root).map((img) => (img.complete ? null : new Promise((res) => { img.onload = img.onerror = res; }))));
+}
+
+async function loadHtml2Pdf() {
+  if (window.html2pdf) return window.html2pdf;
+  await new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
+    s.onload = resolve;
+    s.onerror = () => reject(new Error('No se pudo cargar el generador de PDF (¿sin conexión?).'));
+    document.head.appendChild(s);
+  });
+  return window.html2pdf;
+}
+
+async function quotePdfBlob(q) {
+  ensureQuoteSheetCss();
+  const html2pdf = await loadHtml2Pdf();
+  const holder = el(`<div style="position:fixed;left:-10000px;top:0;width:794px">${quoteSheetHtml(q)}</div>`);
+  document.body.appendChild(holder);
+  try {
+    await waitForImages(holder);
+    return await html2pdf().set({
+      margin: 0,
+      filename: quoteFileName(q),
+      image: { type: 'jpeg', quality: 0.92 },
+      html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+    }).from(holder.firstElementChild).outputPdf('blob');
+  } finally {
+    holder.remove();
+  }
+}
+
+function downloadBlob(blob, name) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+
+// Impresión vectorial (texto seleccionable): abre la hoja sola en una
+// ventana nueva y lanza el diálogo de imprimir / "Guardar como PDF".
+function printQuote(q) {
+  const base = new URL(QUOTE_ASSETS, location.href).href;
+  const w = window.open('', '_blank');
+  if (!w) return toast('El navegador ha bloqueado la ventana emergente.', true);
+  w.document.write(`<!doctype html><html lang="es"><head><meta charset="utf-8"/><title>${esc(quoteFileName(q).replace(/\.pdf$/, ''))}</title>
+    <style>@page { size: A4; margin: 0; } html, body { margin: 0; } body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    ${QUOTE_SHEET_CSS} .qsheet { width: 210mm; height: 296mm; }</style></head>
+    <body>${quoteSheetHtml(q, base)}</body></html>`);
+  w.document.close();
+  waitForImages(w.document).then(() => { w.focus(); w.print(); });
+}
+
+// Reduce el logo del cliente a un PNG pequeño en data URL: se guarda con el
+// presupuesto y el PDF no depende de CORS ni de enlaces externos.
+function imageFileToDataUrl(file, maxW = 440, maxH = 160) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('No se pudo leer la imagen.'));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error('Formato de imagen no válido.'));
+      img.onload = () => {
+        const s = Math.min(1, maxW / img.width, maxH / img.height);
+        const c = document.createElement('canvas');
+        c.width = Math.round(img.width * s);
+        c.height = Math.round(img.height * s);
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        resolve(c.toDataURL('image/png'));
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+MODULES.presupuestos = async (content) => {
+  ensureQuoteSheetCss();
+  const canEditCatalog = QUOTE_CATALOG_ROLES.includes(state.profile.role);
+  let catalog = [];
+  let quotes = [];
+  const catalogByKey = () => Object.fromEntries(catalog.map((c) => [c.key, c]));
+
+  async function loadCatalog() {
+    const { data, error } = await supabase.from('quote_catalog').select('*').order('sort').order('name');
+    if (error) throw new Error(`${error.message}. ¿Has ejecutado la migración 0006_event_quotes.sql?`);
+    catalog = data || [];
+  }
+  async function loadQuotes() {
+    const { data, error } = await supabase.from('event_quotes')
+      .select('id, seq, title, company, event_date, date_label, participants, total, status, event_id, created_at, updated_at, sent_at')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    quotes = data || [];
+  }
+
+  await loadCatalog();
+  await renderList();
+
+  // ---------------- LISTADO ----------------
+  async function renderList() {
+    await loadQuotes();
+    const years = [...new Set(quotes.map((q) => (q.event_date || q.created_at || '').slice(0, 4)).filter(Boolean))].sort().reverse();
+    const thisYear = String(new Date().getFullYear());
+    content.innerHTML = `
+      <div class="content-header"><h1>Presupuestos de eventos</h1>
+        <div>${canEditCatalog ? '<button class="btn secondary" id="qt-catalog">Tarifas</button> ' : ''}<button class="btn" id="qt-new">+ Nuevo presupuesto</button></div>
+      </div>
+      <div class="kpi-row" id="qt-kpis"></div>
+      <div class="row" id="qt-filters">
+        <div class="field"><label>Buscar</label><input id="qt-search" placeholder="Empresa, título o nº…" /></div>
+        <div class="field"><label>Estado</label><select id="qt-status"><option value="">Todos</option>${Object.entries(QUOTE_STATUS).map(([k, v]) => `<option value="${k}">${v.label}</option>`).join('')}</select></div>
+        <div class="field"><label>Año del evento</label><select id="qt-year"><option value="">Todos</option>${years.map((y) => `<option ${y === thisYear ? 'selected' : ''}>${y}</option>`).join('')}</select></div>
+      </div>
+      <div class="card" style="padding:0;overflow-x:auto"><table><thead><tr><th>Nº</th><th>Fecha evento</th><th>Empresa</th><th>Pax</th><th style="text-align:right">Total</th><th>Estado</th><th></th></tr></thead><tbody id="qt-rows"></tbody></table></div>
+    `;
+    qs('#qt-new').onclick = () => openNewQuote();
+    if (canEditCatalog) qs('#qt-catalog').onclick = openCatalog;
+    qsa('#qt-filters input, #qt-filters select').forEach((i) => (i.oninput = renderRows));
+    renderRows();
+  }
+
+  function filteredQuotes() {
+    const term = qs('#qt-search').value.trim().toLowerCase();
+    const status = qs('#qt-status').value;
+    const year = qs('#qt-year').value;
+    return quotes.filter((q) => (!status || q.status === status)
+      && (!year || (q.event_date || q.created_at || '').startsWith(year))
+      && (!term || [q.company, q.title, quoteNumber(q)].some((s) => String(s || '').toLowerCase().includes(term))));
+  }
+
+  function renderRows() {
+    const list = filteredQuotes();
+    const sum = (arr) => arr.reduce((s, q) => s + (Number(q.total) || 0), 0);
+    const accepted = list.filter((q) => q.status === 'aceptado');
+    const decided = list.filter((q) => ['aceptado', 'rechazado', 'enviado'].includes(q.status));
+    const pending = list.filter((q) => q.status === 'enviado');
+    qs('#qt-kpis').innerHTML = `
+      <div class="kpi-card"><div class="num">${list.length}</div><div class="label">Presupuestos</div></div>
+      <div class="kpi-card"><div class="num">${pending.length}</div><div class="label">Enviados sin respuesta · ${fmtEur(sum(pending))}</div></div>
+      <div class="kpi-card"><div class="num">${accepted.length}</div><div class="label">Aceptados · ${fmtEur(sum(accepted))}</div></div>
+      <div class="kpi-card"><div class="num">${decided.length ? Math.round(accepted.length / decided.length * 100) : 0}%</div><div class="label">Tasa de aceptación</div></div>`;
+    qs('#qt-rows').innerHTML = list.map((q) => {
+      const st = QUOTE_STATUS[q.status] || QUOTE_STATUS.borrador;
+      return `<tr>
+        <td class="muted" style="white-space:nowrap">${quoteNumber(q)}</td>
+        <td style="white-space:nowrap">${q.event_date ? fmtDate(q.event_date) : esc(q.date_label || '—')}</td>
+        <td><a href="#presupuestos" class="qt-open" data-id="${q.id}"><b>${esc(q.company)}</b></a><br/><span class="muted">${esc(q.title)}</span></td>
+        <td>${q.participants ?? ''}</td>
+        <td style="text-align:right;font-weight:700;white-space:nowrap">${fmtEur(q.total)}</td>
+        <td><span class="pill" style="background:${st.color}1f;color:${st.color}">${st.label}</span>${q.event_id ? ' <span class="muted" title="Ya está en el calendario de eventos">📅</span>' : ''}</td>
+        <td style="white-space:nowrap"><button class="btn small secondary qt-open" data-id="${q.id}">Abrir</button> <button class="btn small secondary qt-dup" data-id="${q.id}" title="Crear uno nuevo a partir de este">Duplicar</button></td>
+      </tr>`;
+    }).join('') || '<tr><td colspan="7" class="muted">No hay presupuestos con este filtro.</td></tr>';
+    qsa('.qt-open').forEach((b) => (b.onclick = (e) => { e.preventDefault(); openQuote(b.dataset.id); }));
+    qsa('.qt-dup').forEach((b) => (b.onclick = () => openQuote(b.dataset.id, { duplicate: true })));
+  }
+
+  async function openQuote(id, { duplicate = false } = {}) {
+    const { data, error } = await supabase.from('event_quotes').select('*').eq('id', id).single();
+    if (error) return toast(error.message, true);
+    if (duplicate) {
+      const copy = structuredClone(data);
+      ['id', 'seq', 'created_at', 'updated_at', 'sent_at', 'event_id', 'created_by'].forEach((k) => delete copy[k]);
+      Object.assign(copy, { status: 'borrador', event_date: null, date_label: '' });
+      copy.lines = (copy.lines || []).map((l) => ({ ...l, id: crypto.randomUUID() }));
+      return openEditor(copy);
+    }
+    openEditor(data);
+  }
+
+  function openNewQuote() {
+    openEditor({
+      club_id: state.selectedClubId,
+      title: 'EVENTO DEPORTIVO', company: '', contact_name: '', contact_email: '', contact_phone: '',
+      event_date: null, date_label: '', participants: null,
+      lines: [], services: [], services_custom: false, prizes_text: '',
+      discount_pct: 0, total_override: null, vat_mode: 'exento', client_logo: null,
+      status: 'borrador', notes: '', _autoTitle: true, _autoDate: true,
+    });
+  }
+
+  function newLineFromCatalog(key, q) {
+    const c = catalog.find((x) => x.key === key);
+    if (!c) return null;
+    const firstCourt = (q.lines || []).find((l) => l.unit === 'pista_hora');
+    const line = {
+      id: crypto.randomUUID(), key: c.key, cat: c.category, label: c.name, unit: c.unit,
+      qty: 1, hours: 1, price: Number(c.default_price) || 0, descripcion: '', qty_auto: !!c.qty_rule,
+    };
+    if (c.unit === 'pista_hora' || c.unit === 'hora') {
+      line.hours = Number(firstCourt?.hours) || 1;
+    }
+    if (c.unit === 'pista_hora') {
+      line.horario = firstCourt?.horario || '';
+      line.day = firstCourt?.day || '';
+    }
+    return line;
+  }
+
+  // ---------------- EDITOR ----------------
+  function openEditor(q) {
+    q.lines = q.lines || [];
+    q._autoTitle = q._autoTitle ?? (!q.title || q.title === `EVENTO DEPORTIVO ${String(q.company || '').toUpperCase()}`.trim());
+    q._autoDate = q._autoDate ?? (!q.date_label || q.date_label === quoteDateLabel(q.event_date));
+    let dirty = false;
+    const isNew = !q.id;
+
+    content.innerHTML = `
+      <div class="content-header">
+        <div><a href="#presupuestos" id="q-back" class="muted">&larr; Presupuestos</a>
+          <h1 style="margin-top:4px">${isNew ? 'Nuevo presupuesto' : `Presupuesto ${quoteNumber(q)}`} <span id="q-dirty" class="muted" style="font-weight:400"></span></h1></div>
+        <div class="q-actions">
+          <select id="q-status" style="width:auto">${Object.entries(QUOTE_STATUS).map(([k, v]) => `<option value="${k}" ${q.status === k ? 'selected' : ''}>${v.label}</option>`).join('')}</select>
+          <button class="btn" id="q-save">Guardar</button>
+          <button class="btn secondary" id="q-pdf">Descargar PDF</button>
+          <button class="btn secondary" id="q-print" title="Abre el diálogo de imprimir: elige 'Guardar como PDF' para un PDF con texto seleccionable">Imprimir</button>
+          <button class="btn secondary" id="q-email">Enviar por email</button>
+          <button class="btn secondary" id="q-to-event"></button>
+          ${!isNew ? '<button class="btn secondary" id="q-dup">Duplicar</button> <button class="btn danger small" id="q-del">Eliminar</button>' : ''}
+        </div>
+      </div>
+      <div class="q-editor">
+        <div class="q-form">
+          <div class="card">
+            <h2>Cliente y evento</h2>
+            <div class="row">
+              <div class="field"><label>Empresa / cliente *</label><input id="q-company" value="${esc(q.company)}" placeholder="Ej. Power Electronics" /></div>
+              <div class="field"><label>Nº participantes</label><input type="number" min="0" id="q-participants" value="${q.participants ?? ''}" /></div>
+            </div>
+            <div class="field"><label>Título del PDF <span class="muted" style="font-weight:400">(se rellena solo con la empresa)</span></label><input id="q-title" value="${esc(q.title)}" /></div>
+            <div class="row">
+              <div class="field"><label>Fecha del evento</label><input type="date" id="q-date" value="${q.event_date || ''}" /></div>
+              <div class="field"><label>Texto de la fecha en el PDF</label><input id="q-date-label" value="${esc(q.date_label || '')}" placeholder="Ej. Sábado 7 noviembre 2026 / 17 o 24 de abril" /></div>
+            </div>
+            <div class="row">
+              <div class="field"><label>Contacto</label><input id="q-contact-name" value="${esc(q.contact_name || '')}" /></div>
+              <div class="field"><label>Email</label><input type="email" id="q-contact-email" value="${esc(q.contact_email || '')}" /></div>
+              <div class="field"><label>Teléfono</label><input id="q-contact-phone" value="${esc(q.contact_phone || '')}" /></div>
+            </div>
+            <div class="field"><label>Logo del cliente (sale arriba a la derecha en el PDF)</label>
+              <div style="display:flex;gap:10px;align-items:center">
+                <input type="file" id="q-logo" accept="image/*" style="flex:1" />
+                <button class="btn small secondary ${q.client_logo ? '' : 'hidden'}" id="q-logo-del">Quitar logo</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+              <h2 style="margin:0">Desglose interno <span class="muted" style="font-weight:400">(no lo ve el cliente)</span></h2>
+              <div class="q-presets">Plantilla rápida: ${QUOTE_PRESETS.map((p, i) => `<button class="btn small secondary q-preset" data-i="${i}">${esc(p.label)}</button>`).join(' ')}</div>
+            </div>
+            <div style="overflow-x:auto;margin-top:10px"><table class="q-lines"><thead><tr>
+              <th>Concepto</th><th>Día / horario</th><th>Cant.</th><th>Horas</th><th>€/ud</th><th style="text-align:right">Importe</th><th></th>
+            </tr></thead><tbody id="q-lines-body"></tbody></table></div>
+            <div class="row" style="margin-top:10px;align-items:flex-end">
+              <div class="field" style="flex:3"><label>Añadir concepto</label><select id="q-add-key">
+                ${Object.entries(QUOTE_CATEGORY_LABEL).map(([cat, label]) => {
+                  const items = catalog.filter((c) => c.active && c.category === cat);
+                  return items.length ? `<optgroup label="${esc(label)}">${items.map((c) => `<option value="${c.key}">${esc(c.name)} — ${fmtEur(c.default_price)}${c.unit === 'pista_hora' || c.unit === 'hora' ? '/h' : c.unit === 'persona' ? '/pers.' : ''}</option>`).join('')}</optgroup>` : '';
+                }).join('')}
+              </select></div>
+              <div class="field" style="flex:1;min-width:110px"><button class="btn" id="q-add" style="width:100%">+ Añadir</button></div>
+            </div>
+            <div class="tip" style="margin-bottom:0">Escribe el horario como <b>de 9:30 a 14:30</b> y las horas se calculan solas. Los botes de bolas siguen al nº de pistas de pádel y el avituallamiento al nº de participantes, salvo que cambies la cantidad a mano.</div>
+          </div>
+
+          <div class="card">
+            <h2>Precio</h2>
+            <div class="row">
+              <div class="field"><label>Descuento %</label><input type="number" step="any" min="0" max="100" id="q-discount" value="${Number(q.discount_pct) || ''}" /></div>
+              <div class="field"><label>Precio cerrado (opcional)</label><input type="number" step="any" min="0" id="q-override" value="${q.total_override ?? ''}" placeholder="Usa el calculado" /></div>
+              <div class="field"><label>IVA</label><select id="q-vat">
+                <option value="exento" ${q.vat_mode === 'exento' ? 'selected' : ''}>Exento (art. 20.1.13º)</option>
+                <option value="mas_iva" ${q.vat_mode === 'mas_iva' ? 'selected' : ''}>Precio + 21% IVA</option>
+                <option value="iva_incluido" ${q.vat_mode === 'iva_incluido' ? 'selected' : ''}>IVA incluido</option>
+                <option value="ninguno" ${q.vat_mode === 'ninguno' ? 'selected' : ''}>Sin nota de IVA</option>
+              </select></div>
+            </div>
+            <div id="q-totals"></div>
+          </div>
+
+          <div class="card">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+              <h2 style="margin:0">Servicios que ve el cliente</h2>
+              <span id="q-services-mode" class="muted"></span>
+            </div>
+            <div class="field" style="margin-top:8px"><label>Una viñeta por línea</label><textarea id="q-services" rows="10"></textarea></div>
+            <div class="field"><label>Premios (bloque aparte, opcional)</label><textarea id="q-prizes" rows="2"></textarea></div>
+          </div>
+
+          <div class="card">
+            <h2>Notas internas</h2>
+            <textarea id="q-notes" rows="3" placeholder="Condiciones negociadas, quién lo pidió, recordatorios…">${esc(q.notes || '')}</textarea>
+          </div>
+        </div>
+        <div class="q-preview-col">
+          <div class="muted" style="margin-bottom:6px">Vista previa del PDF</div>
+          <div class="q-preview" id="q-preview"></div>
+        </div>
+      </div>
+    `;
+
+    const preview = qs('#q-preview');
+    const linesBody = qs('#q-lines-body');
+
+    function markDirty() { dirty = true; qs('#q-dirty').textContent = '· sin guardar'; }
+    function setClean() { dirty = false; qs('#q-dirty').textContent = ''; }
+
+    function applyAutoQty() {
+      const cat = catalogByKey();
+      const courts = quotePadelCourts(q.lines);
+      q.lines.forEach((l) => {
+        const rule = cat[l.key]?.qty_rule;
+        if (!rule || l.qty_auto !== true) return;
+        l.qty = rule === 'pistas' ? courts : (Number(q.participants) || 0);
+      });
+    }
+
+    function recompute() {
+      applyAutoQty();
+      if (!q.services_custom) {
+        const gen = buildQuoteServices(q, catalogByKey());
+        q.services = gen.services;
+        q.prizes_text = gen.prizes_text;
+        qs('#q-services').value = q.services.join('\n');
+        qs('#q-prizes').value = q.prizes_text;
+      }
+      qs('#q-services-mode').innerHTML = q.services_custom
+        ? 'Editado a mano · <a href="#" id="q-regen">volver a generarlas solas</a>'
+        : 'Se generan solas desde el desglose';
+      const regen = qs('#q-regen');
+      if (regen) regen.onclick = (e) => { e.preventDefault(); q.services_custom = false; markDirty(); recompute(); };
+      // Refresca cantidades automáticas e importes sin redibujar la tabla
+      // (así no se pierde el foco del campo que se está escribiendo).
+      q.lines.forEach((l) => {
+        const row = qs(`tr[data-id="${l.id}"]`, linesBody);
+        if (!row) return;
+        const qtyInput = qs('[data-f="qty"]', row);
+        if (qtyInput && document.activeElement !== qtyInput && Number(qtyInput.value) !== Number(l.qty)) qtyInput.value = l.qty;
+        const hoursInput = qs('[data-f="hours"]', row);
+        if (hoursInput && document.activeElement !== hoursInput && Number(hoursInput.value) !== Number(l.hours)) hoursInput.value = l.hours;
+        qs('.q-amount', row).textContent = fmtEur(quoteLineAmount(l));
+      });
+      renderTotals();
+      renderPreview();
+      renderEventButton();
+    }
+
+    function renderTotals() {
+      const t = quoteTotals(q);
+      const pax = Number(q.participants) || 0;
+      const courtHours = q.lines.filter((l) => l.unit === 'pista_hora').reduce((s, l) => s + (Number(l.qty) || 0) * (Number(l.hours) || 0), 0);
+      const courtAmount = q.lines.filter((l) => l.unit === 'pista_hora').reduce((s, l) => s + quoteLineAmount(l), 0);
+      qs('#q-totals').innerHTML = `
+        <table class="q-sum">
+          <tr><td>Suma del desglose</td><td>${fmtEur(t.subtotal)}</td></tr>
+          ${t.discount ? `<tr><td>Descuento (${fmtNum(q.discount_pct)}%)</td><td>−${fmtEur(t.discount)}</td></tr>` : ''}
+          ${t.total !== t.calculated ? `<tr><td>Calculado</td><td>${fmtEur(t.calculated)}</td></tr><tr><td>Precio cerrado</td><td>${fmtEur(t.total)} <span class="muted">(${t.total >= t.calculated ? '+' : '−'}${fmtEur(Math.abs(t.total - t.calculated))})</span></td></tr>` : ''}
+          <tr class="q-sum-total"><td>Total para el cliente</td><td>${fmtEur(t.total)}${q.vat_mode === 'mas_iva' ? ' + IVA' : ''}</td></tr>
+        </table>
+        <div class="muted" style="margin-top:6px">
+          ${pax ? `${fmtEur(t.total / pax)} por participante · ` : ''}${courtHours ? `${fmtNum(courtHours)} horas de pista · media ${fmtEur(courtAmount / courtHours)}/pista-hora` : ''}
+        </div>`;
+    }
+
+    let previewTimer = null;
+    function renderPreview() {
+      clearTimeout(previewTimer);
+      previewTimer = setTimeout(() => {
+        preview.innerHTML = quoteSheetHtml(q);
+        scalePreview();
+      }, 80);
+    }
+    function scalePreview() {
+      const sheet = qs('.qsheet', preview);
+      if (sheet) sheet.style.transform = `scale(${preview.clientWidth / 794})`;
+    }
+    const ro = new ResizeObserver(scalePreview);
+    ro.observe(preview);
+
+    function renderEventButton() {
+      const b = qs('#q-to-event');
+      b.textContent = q.event_id ? 'Ver en calendario' : 'Aceptado → calendario';
+      b.title = q.event_id ? 'Este presupuesto ya está en el calendario de Eventos' : 'Marca el presupuesto como aceptado y crea el evento en el calendario';
+    }
+
+    function lineRow(l) {
+      const perHour = l.unit === 'pista_hora' || l.unit === 'hora';
+      const isCourt = l.unit === 'pista_hora';
+      const needsDesc = /\{descripcion\}/.test(catalogByKey()[l.key]?.client_text || '{descripcion}');
+      return `<tr data-id="${l.id}">
+        <td style="min-width:170px"><input data-f="label" value="${esc(l.label)}" />
+          ${needsDesc ? `<input data-f="descripcion" value="${esc(l.descripcion || '')}" placeholder="Texto para el PDF" style="margin-top:4px" />` : ''}
+          <div class="muted">${QUOTE_UNIT_LABEL[l.unit] || ''}</div></td>
+        <td style="min-width:150px">${isCourt ? `<input data-f="day" value="${esc(l.day || '')}" placeholder="Día (si hay varios)" />
+          <input data-f="horario" value="${esc(l.horario || '')}" placeholder="de 9:00 a 14:00" style="margin-top:4px" />` : ''}</td>
+        <td style="width:74px">${l.unit === 'fijo' ? '' : `<input type="number" step="any" min="0" data-f="qty" value="${l.qty ?? ''}" title="${l.qty_auto ? 'Cantidad automática' : ''}" />`}</td>
+        <td style="width:70px">${perHour ? `<input type="number" step="any" min="0" data-f="hours" value="${l.hours ?? ''}" />` : ''}</td>
+        <td style="width:82px"><input type="number" step="any" min="0" data-f="price" value="${l.price ?? ''}" /></td>
+        <td class="q-amount" style="text-align:right;font-weight:600;white-space:nowrap">${fmtEur(quoteLineAmount(l))}</td>
+        <td style="white-space:nowrap"><button class="btn small secondary q-up" title="Subir">↑</button> <button class="btn small secondary q-del-line" title="Quitar">✕</button></td>
+      </tr>`;
+    }
+
+    function renderLines() {
+      linesBody.innerHTML = q.lines.map(lineRow).join('')
+        || '<tr><td colspan="7" class="muted">Empieza con una plantilla rápida o añade conceptos abajo.</td></tr>';
+      qsa('tr[data-id]', linesBody).forEach((row) => {
+        const line = q.lines.find((l) => l.id === row.dataset.id);
+        qsa('input', row).forEach((input) => {
+          input.oninput = () => {
+            const f = input.dataset.f;
+            line[f] = input.type === 'number' ? (input.value === '' ? null : Number(input.value)) : input.value;
+            if (f === 'qty') line.qty_auto = false;
+            if (f === 'horario') {
+              const h = parseHorarioHours(input.value);
+              if (h) line.hours = h;
+            }
+            markDirty();
+            recompute();
+          };
+        });
+        qs('.q-del-line', row).onclick = () => { q.lines = q.lines.filter((l) => l.id !== line.id); markDirty(); renderLines(); };
+        qs('.q-up', row).onclick = () => {
+          const i = q.lines.indexOf(line);
+          if (i > 0) { [q.lines[i - 1], q.lines[i]] = [q.lines[i], q.lines[i - 1]]; markDirty(); renderLines(); }
+        };
+      });
+      recompute();
+    }
+
+    // --- datos generales ---
+    const bindings = [
+      ['#q-company', (v) => {
+        q.company = v;
+        if (q._autoTitle) { q.title = `EVENTO DEPORTIVO ${v.toUpperCase()}`.trim(); qs('#q-title').value = q.title; }
+      }],
+      ['#q-title', (v) => { q.title = v; q._autoTitle = false; }],
+      ['#q-participants', (v) => { q.participants = v === '' ? null : Number(v); }],
+      ['#q-date', (v) => {
+        q.event_date = v || null;
+        if (q._autoDate) { q.date_label = quoteDateLabel(v); qs('#q-date-label').value = q.date_label; }
+      }],
+      ['#q-date-label', (v) => { q.date_label = v; q._autoDate = !v; }],
+      ['#q-contact-name', (v) => { q.contact_name = v; }],
+      ['#q-contact-email', (v) => { q.contact_email = v; }],
+      ['#q-contact-phone', (v) => { q.contact_phone = v; }],
+      ['#q-discount', (v) => { q.discount_pct = Number(v) || 0; }],
+      ['#q-override', (v) => { q.total_override = v === '' ? null : Number(v); }],
+      ['#q-vat', (v) => { q.vat_mode = v; }],
+      ['#q-status', (v) => { q.status = v; }],
+      ['#q-notes', (v) => { q.notes = v; }],
+      ['#q-services', (v) => { q.services = v.split('\n'); q.services_custom = true; }],
+      ['#q-prizes', (v) => { q.prizes_text = v; q.services_custom = true; }],
+    ];
+    bindings.forEach(([sel, fn]) => {
+      const input = qs(sel);
+      input.addEventListener(input.tagName === 'SELECT' ? 'change' : 'input', () => { fn(input.value); markDirty(); recompute(); });
+    });
+
+    qs('#q-logo').onchange = async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      try {
+        q.client_logo = await imageFileToDataUrl(file);
+        qs('#q-logo-del').classList.remove('hidden');
+        markDirty(); recompute();
+      } catch (err) { toast(err.message, true); }
+    };
+    qs('#q-logo-del').onclick = () => {
+      q.client_logo = null; qs('#q-logo').value = ''; qs('#q-logo-del').classList.add('hidden'); markDirty(); recompute();
+    };
+
+    qs('#q-add').onclick = () => {
+      const line = newLineFromCatalog(qs('#q-add-key').value, q);
+      if (!line) return;
+      q.lines.push(line);
+      markDirty();
+      renderLines();
+      const row = qs(`tr[data-id="${line.id}"]`, linesBody);
+      qs(line.unit === 'pista_hora' ? '[data-f="qty"]' : 'input', row)?.focus();
+    };
+    qsa('.q-preset').forEach((b) => (b.onclick = () => {
+      if (q.lines.length && !confirm('¿Sustituir el desglose actual por esta plantilla?')) return;
+      q.lines = [];
+      QUOTE_PRESETS[Number(b.dataset.i)].items.forEach((key) => {
+        const line = newLineFromCatalog(key, q);
+        if (line) q.lines.push(line);
+      });
+      q.services_custom = false;
+      markDirty();
+      renderLines();
+      qs('[data-f="qty"]', linesBody)?.focus();
+    }));
+
+    // --- acciones ---
+    async function save({ silent = false } = {}) {
+      if (!q.company.trim()) { toast('Pon el nombre de la empresa/cliente.', true); qs('#q-company').focus(); return false; }
+      const payload = {
+        club_id: q.club_id || state.selectedClubId,
+        title: q.title.trim() || 'EVENTO DEPORTIVO',
+        company: q.company.trim(),
+        contact_name: q.contact_name?.trim() || null,
+        contact_email: q.contact_email?.trim() || null,
+        contact_phone: q.contact_phone?.trim() || null,
+        event_date: q.event_date || null,
+        date_label: q.date_label?.trim() || null,
+        participants: q.participants ?? null,
+        lines: q.lines,
+        services: (q.services || []).map((s) => String(s).trim()).filter(Boolean),
+        services_custom: !!q.services_custom,
+        prizes_text: q.prizes_text?.trim() || null,
+        discount_pct: Number(q.discount_pct) || 0,
+        total_override: q.total_override ?? null,
+        total: quoteTotals(q).total,
+        vat_mode: q.vat_mode || 'exento',
+        client_logo: q.client_logo || null,
+        status: q.status,
+        event_id: q.event_id || null,
+        notes: q.notes?.trim() || null,
+        sent_at: q.sent_at || null,
+        updated_at: new Date().toISOString(),
+      };
+      const res = q.id
+        ? await supabase.from('event_quotes').update(payload).eq('id', q.id).select().single()
+        : await supabase.from('event_quotes').insert(payload).select().single();
+      if (res.error) { toast(res.error.message, true); return false; }
+      const wasNew = !q.id;
+      Object.assign(q, { id: res.data.id, seq: res.data.seq, created_at: res.data.created_at });
+      setClean();
+      if (wasNew) qs('.content-header h1').firstChild.textContent = `Presupuesto ${quoteNumber(q)} `;
+      if (!silent) toast('Presupuesto guardado.');
+      return true;
+    }
+
+    async function withBusy(button, fn) {
+      const label = button.textContent;
+      button.disabled = true;
+      button.textContent = 'Un momento…';
+      try { await fn(); } catch (err) { console.error(err); toast(err.message || String(err), true); }
+      finally {
+        button.disabled = false;
+        // fn puede haber cambiado el texto (ej. "Ver en calendario"): no pisarlo.
+        if (button.textContent === 'Un momento…') button.textContent = label;
+      }
+    }
+
+    qs('#q-save').onclick = () => save();
+    qs('#q-back').onclick = (e) => {
+      e.preventDefault();
+      if (dirty && !confirm('Hay cambios sin guardar. ¿Salir igualmente?')) return;
+      ro.disconnect();
+      renderList();
+    };
+    qs('#q-pdf').onclick = (e) => withBusy(e.currentTarget, async () => downloadBlob(await quotePdfBlob(q), quoteFileName(q)));
+    qs('#q-print').onclick = () => printQuote(q);
+    qs('#q-email').onclick = () => openSendEmail();
+    qs('#q-to-event').onclick = (e) => {
+      if (q.event_id) { location.hash = '#eventos'; return; }
+      withBusy(e.currentTarget, createEvent);
+    };
+    qs('#q-dup')?.addEventListener('click', () => {
+      if (dirty && !confirm('Hay cambios sin guardar en este presupuesto. ¿Duplicar igualmente (sin esos cambios)?')) return;
+      ro.disconnect();
+      openQuote(q.id, { duplicate: true });
+    });
+    qs('#q-del')?.addEventListener('click', async () => {
+      if (!confirm(`¿Eliminar el presupuesto ${quoteNumber(q)} de ${q.company}? No se puede deshacer.`)) return;
+      const { error } = await supabase.from('event_quotes').delete().eq('id', q.id);
+      if (error) return toast(error.message, true);
+      toast('Presupuesto eliminado.');
+      ro.disconnect();
+      renderList();
+    });
+
+    async function createEvent() {
+      const firstCourt = q.lines.find((l) => l.unit === 'pista_hora');
+      const range = quoteHorarioRange(firstCourt?.horario);
+      if (!q.event_date) throw new Error('Pon la fecha del evento antes de pasarlo al calendario.');
+      if (!range) throw new Error('Indica el horario de las pistas (ej. "de 9:00 a 14:00") para crear el evento.');
+      if (!confirm(`Se marcará como aceptado y se creará el evento de ${q.company} el ${fmtDate(q.event_date)} en el calendario. ¿Continuar?`)) return;
+      const courts = q.lines.filter((l) => l.unit === 'pista_hora' && (l.day || '') === (firstCourt.day || ''))
+        .reduce((s, l) => s + (Number(l.qty) || 0), 0);
+      const { data: ev, error } = await supabase.from('events').insert({
+        club_id: q.club_id || state.selectedClubId,
+        date: q.event_date,
+        start_hour: range.start,
+        end_hour: range.end,
+        company: q.company.trim(),
+        contact_name: q.contact_name?.trim() || null,
+        contact_email: q.contact_email?.trim() || null,
+        contact_phone: q.contact_phone?.trim() || null,
+        num_courts: courts || 1,
+        category: 'Alquiler empresa',
+        status: 'confirmado',
+        extras: { presupuesto: quoteNumber(q), total: quoteTotals(q).total },
+      }).select().single();
+      if (error) throw new Error(`No se pudo crear el evento: ${error.message}`);
+      q.event_id = ev.id;
+      q.status = 'aceptado';
+      qs('#q-status').value = 'aceptado';
+      if (await save({ silent: true })) toast('Evento creado en el calendario y presupuesto marcado como aceptado.');
+      renderEventButton();
+    }
+
+    function openSendEmail() {
+      if (!q.services?.length) return toast('El presupuesto no tiene servicios todavía.', true);
+      const tmpl = state.emailTemplates.find((t) => t.key === 'presupuesto_evento');
+      const vars = {
+        nombre: q.contact_name || q.company, empresa: q.company, fecha: q.date_label || fmtDate(q.event_date),
+        total: fmtEur(quoteTotals(q).total) + (q.vat_mode === 'mas_iva' ? ' + IVA' : ''), club: CLUB_BRAND,
+      };
+      // fillTemplate escapa a HTML; aquí el cuerpo va a un textarea editable
+      // y se escapa al enviar, así que se rellena en texto plano.
+      const plain = (s) => s.replace(/\{\{(\w+)\}\}/g, (_, k) => vars[k] ?? '');
+      const modal = openModal('Enviar presupuesto por email', `
+        <div class="field"><label>Para</label><input type="email" id="qe-to" value="${esc(q.contact_email || '')}" placeholder="email@empresa.com" /></div>
+        <div class="field"><label>Asunto</label><input id="qe-subject" value="${esc(plain(tmpl?.subject || 'Presupuesto evento deportivo - {{empresa}}'))}" /></div>
+        <div class="field"><label>Mensaje</label><textarea id="qe-body" rows="9">${esc(plain(tmpl?.body || 'Hola {{nombre}},\n\nTe adjuntamos el presupuesto del evento deportivo ({{fecha}}).\n\nUn saludo,\n{{club}}'))}</textarea></div>
+        <p class="muted">Se adjunta <b>${esc(quoteFileName(q))}</b>. El presupuesto se guarda y se marca como "Enviado".</p>
+        <button class="btn" id="qe-send" style="width:100%">Enviar</button>
+      `, { wide: true });
+      qs('#qe-send', modal).onclick = (e) => withBusy(e.currentTarget, async () => {
+        const to = qs('#qe-to', modal).value.trim();
+        if (!to) throw new Error('Falta el email del destinatario.');
+        if (!q.contact_email) { q.contact_email = to; qs('#q-contact-email').value = to; }
+        if (q.status === 'borrador') { q.status = 'enviado'; qs('#q-status').value = 'enviado'; }
+        q.sent_at = new Date().toISOString();
+        if (!(await save({ silent: true }))) return;
+        const blob = await quotePdfBlob(q);
+        const name = quoteFileName(q);
+        const path = `presupuestos/${crypto.randomUUID()}/${name}`;
+        const { error: upErr } = await supabase.storage.from('attachments').upload(path, blob, { contentType: 'application/pdf' });
+        if (upErr) throw upErr;
+        const { data: pub } = supabase.storage.from('attachments').getPublicUrl(path);
+        await sendEmail({
+          to, subject: qs('#qe-subject', modal).value.trim(),
+          html: esc(qs('#qe-body', modal).value).replace(/\n/g, '<br/>'),
+          attachmentUrl: pub.publicUrl, attachmentName: name,
+        });
+        modal.remove();
+        toast(`Presupuesto enviado a ${to}.`);
+      });
+    }
+
+    // Solo avisa al cerrar la pestaña si el editor sigue en pantalla.
+    window.onbeforeunload = () => (dirty && document.body.contains(preview) ? true : undefined);
+    renderLines();
+    if (!isNew) setClean();
+  }
+
+  // ---------------- TARIFAS ----------------
+  function openCatalog() {
+    const modal = openModal('Tarifas de presupuestos', `
+      <p class="muted">Precios por defecto al añadir cada concepto (en cada presupuesto se pueden cambiar) y el texto que sale en el PDF. En el texto puedes usar {n} (cantidad), {participantes}, {horas} y {descripcion}; una viñeta por línea.</p>
+      <div style="overflow-x:auto"><table class="q-lines"><thead><tr><th>Concepto</th><th>Cálculo</th><th>Precio</th><th>Texto en el PDF</th><th>Activo</th><th></th></tr></thead>
+      <tbody>${catalog.map((c) => `<tr data-id="${c.id}">
+        <td style="min-width:160px"><input data-f="name" value="${esc(c.name)}" /><div class="muted">${esc(QUOTE_CATEGORY_LABEL[c.category] || c.category)}</div></td>
+        <td class="muted" style="font-size:12px">${QUOTE_UNIT_LABEL[c.unit]}</td>
+        <td style="width:90px"><input type="number" step="any" min="0" data-f="default_price" value="${c.default_price}" /></td>
+        <td style="min-width:260px"><textarea data-f="client_text" rows="${Math.min(6, Math.max(2, c.client_text.split('\n').length))}">${esc(c.client_text)}</textarea></td>
+        <td><input type="checkbox" data-f="active" style="width:auto" ${c.active ? 'checked' : ''} /></td>
+        <td><button class="btn small qc-save">Guardar</button></td>
+      </tr>`).join('')}</tbody></table></div>
+      <h3 style="margin-top:16px">Nuevo concepto</h3>
+      <div class="row">
+        <div class="field"><label>Nombre</label><input id="qc-name" /></div>
+        <div class="field"><label>Categoría</label><select id="qc-cat">${Object.entries(QUOTE_CATEGORY_LABEL).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></div>
+        <div class="field"><label>Cálculo</label><select id="qc-unit">${Object.entries(QUOTE_UNIT_LABEL).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></div>
+        <div class="field"><label>Precio</label><input type="number" step="any" min="0" id="qc-price" /></div>
+      </div>
+      <div class="field"><label>Texto en el PDF</label><input id="qc-text" /></div>
+      <button class="btn" id="qc-add">Añadir concepto</button>
+    `, { wide: true });
+    qs('.modal', modal).style.width = '980px';
+    qsa('tr[data-id]', modal).forEach((row) => {
+      qs('.qc-save', row).onclick = async () => {
+        const payload = {
+          name: qs('[data-f="name"]', row).value.trim(),
+          default_price: Number(qs('[data-f="default_price"]', row).value) || 0,
+          client_text: qs('[data-f="client_text"]', row).value.trim(),
+          active: qs('[data-f="active"]', row).checked,
+        };
+        const { error } = await supabase.from('quote_catalog').update(payload).eq('id', row.dataset.id);
+        if (error) return toast(error.message, true);
+        Object.assign(catalog.find((c) => c.id === row.dataset.id), payload);
+        toast('Tarifa guardada.');
+      };
+    });
+    qs('#qc-add', modal).onclick = async () => {
+      const name = qs('#qc-name', modal).value.trim();
+      if (!name) return toast('Pon un nombre al concepto.', true);
+      const key = name.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') + '_' + Date.now().toString(36);
+      const { error } = await supabase.from('quote_catalog').insert({
+        key, name, category: qs('#qc-cat', modal).value, unit: qs('#qc-unit', modal).value,
+        default_price: Number(qs('#qc-price', modal).value) || 0, client_text: qs('#qc-text', modal).value.trim(), sort: 90,
+      });
+      if (error) return toast(error.message, true);
+      await loadCatalog();
+      modal.remove();
+      toast('Concepto añadido.');
+      openCatalog();
     };
   }
 };

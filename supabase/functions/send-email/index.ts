@@ -9,6 +9,17 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// String.fromCharCode(...buf) de golpe revienta la pila con ficheros de más
+// de ~100 KB (un PDF de presupuesto ronda los 300-500 KB): se hace por trozos.
+function toBase64(buf: Uint8Array): string {
+  let binary = "";
+  const chunk = 0x8000;
+  for (let i = 0; i < buf.length; i += chunk) {
+    binary += String.fromCharCode(...buf.subarray(i, i + chunk));
+  }
+  return btoa(binary);
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -63,13 +74,19 @@ Deno.serve(async (req) => {
 
       if (attachmentUrl) {
         const fileRes = await fetch(attachmentUrl);
-        if (fileRes.ok) {
-          const buf = new Uint8Array(await fileRes.arrayBuffer());
-          payload.attachments = [{
-            filename: attachmentName || "adjunto",
-            content: btoa(String.fromCharCode(...buf)),
-          }];
+        // Mejor fallar que mandar el email sin el adjunto (ej. un presupuesto
+        // sin su PDF).
+        if (!fileRes.ok) {
+          return new Response(JSON.stringify({ error: `No se pudo descargar el adjunto (${fileRes.status})` }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
         }
+        const buf = new Uint8Array(await fileRes.arrayBuffer());
+        payload.attachments = [{
+          filename: attachmentName || "adjunto",
+          content: toBase64(buf),
+        }];
       }
 
       const resendRes = await fetch("https://api.resend.com/emails", {

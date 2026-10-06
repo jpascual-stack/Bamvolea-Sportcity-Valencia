@@ -5,6 +5,12 @@ de eventos/alquileres y KPIs). Stack: Supabase (Postgres + Auth + Storage +
 Edge Functions) y un único `index.html` en JavaScript vanilla, sin build
 step, pensado para hospedar en Vercel o cualquier hosting estático.
 
+**Modo solo eventos (activo):** ahora mismo la app muestra únicamente
+Eventos (Presupuestos y Calendario) y Configuración (Plantillas de email),
+con la imagen corporativa de Bamvolea. El resto de módulos sigue en el
+código pero oculto; para recuperarlos, pon `EVENTS_ONLY = false` en
+`index.html`.
+
 Alcance de esta primera versión: Alumnos, Parrilla, Lista de espera, Tareas,
 Grupos, Planificación, KPIs, Entrenadores/Vista entrenador, Eventos y
 Gestión (plantillas de email + Playtomic Manager). No incluye Casales

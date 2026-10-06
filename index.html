@@ -3,7 +3,10 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
-<title>CRM Bamvolea Sportcity Valencia</title>
+<title>Bamvolea Sportcity · Eventos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
 <script>
   // Rellena esto con los datos de tu propio proyecto Supabase (ver README).
   // window.SUPABASE_ANON_KEY es pública por diseño: la seguridad real vive
@@ -13,33 +16,43 @@
   window.EVENTOS_PROVEEDOR_EMAIL = ''; // opcional: email del proveedor de catering/extras
 </script>
 <style>
+  /* Colores corporativos Bamvolea Sportcity (los mismos del PDF de
+     presupuesto): azul noche, azul pista y verde neón. El verde neón solo se
+     usa sobre fondo oscuro; sobre blanco no se lee. */
   :root {
-    --court: #2f6f4f;
-    --court-dark: #1d4a34;
-    --court-light: #e6f2ec;
-    --accent: #d98c3a;
-    --bg: #f5f7f6;
+    --navy: #06122b;
+    --navy-2: #0c1d42;
+    --neon: #00ff00;
+    --court: #2b67ed;
+    --court-dark: #1847b8;
+    --court-light: #eaf0fe;
+    --accent: #00c853;
+    --bg: #f3f5f9;
     --card: #ffffff;
-    --border: #dfe6e2;
-    --text: #1d2624;
-    --text-muted: #66756f;
-    --danger: #b3413a;
+    --border: #e1e6ef;
+    --text: #0b1630;
+    --text-muted: #5d6882;
+    --danger: #d23b3b;
     --warning: #c98a1d;
-    --ok: #2f6f4f;
+    --ok: #12924a;
     --radius: 10px;
-    --shadow: 0 1px 2px rgba(0,0,0,.06), 0 2px 8px rgba(0,0,0,.04);
+    --shadow: 0 1px 2px rgba(6,18,43,.06), 0 4px 14px rgba(6,18,43,.05);
   }
   * { box-sizing: border-box; }
-  body { margin: 0; font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: var(--bg); color: var(--text); }
+  body { margin: 0; font-family: "Inter", -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased; background: var(--bg); color: var(--text); }
   a { color: var(--court-dark); }
+  td a { text-decoration: none; }
+  td a:hover { text-decoration: underline; }
   button { cursor: pointer; font-family: inherit; }
-  .btn { background: var(--court); color: #fff; border: none; padding: 8px 14px; border-radius: var(--radius); font-size: 14px; font-weight: 600; }
-  .btn:hover { background: var(--court-dark); }
-  .btn.secondary { background: #fff; color: var(--court-dark); border: 1px solid var(--border); }
+  .btn { background: var(--court); color: #fff; border: none; padding: 9px 16px; border-radius: 8px; font-size: 14px; font-weight: 600; transition: background .15s, box-shadow .15s; }
+  .btn:hover { background: var(--court-dark); box-shadow: 0 2px 8px rgba(43,103,237,.25); }
+  .btn.secondary { background: #fff; color: var(--navy); border: 1px solid var(--border); }
+  .btn.secondary:hover { background: var(--court-light); border-color: #c9d6f7; box-shadow: none; }
   .btn.danger { background: var(--danger); }
   .btn.small { padding: 4px 10px; font-size: 12px; }
   .btn:disabled { opacity: .5; cursor: not-allowed; }
   input, select, textarea { font-family: inherit; font-size: 14px; padding: 7px 10px; border: 1px solid var(--border); border-radius: 8px; background: #fff; color: var(--text); width: 100%; }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--court); box-shadow: 0 0 0 3px rgba(43,103,237,.15); }
   label { font-size: 12px; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 3px; }
   .field { margin-bottom: 10px; }
   .card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 16px; }
@@ -47,47 +60,56 @@
   .row > * { flex: 1; min-width: 160px; }
   table { width: 100%; border-collapse: collapse; font-size: 14px; }
   th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  tbody tr:hover td { background: #f7f9fd; }
   th { color: var(--text-muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .03em; }
   .pill { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 600; }
-  .pill.activo { background: #e3f3e9; color: var(--ok); }
+  .pill.activo { background: #e2f5ea; color: var(--ok); }
   .pill.espera { background: #fdf1de; color: var(--warning); }
   .pill.baja { background: #f6e4e2; color: var(--danger); }
-  .pill.pagado { background: #e3f3e9; color: var(--ok); }
+  .pill.pagado { background: #e2f5ea; color: var(--ok); }
   .pill.pendiente { background: #fdf1de; color: var(--warning); }
   .tip { background: var(--court-light); border-left: 4px solid var(--court); padding: 10px 14px; border-radius: 6px; font-size: 13px; margin: 10px 0; }
   .warn { background: #fdf1de; border-left: 4px solid var(--warning); padding: 10px 14px; border-radius: 6px; font-size: 13px; margin: 10px 0; }
   .hidden { display: none !important; }
-  h1 { font-size: 20px; margin: 0 0 4px; }
-  h2 { font-size: 16px; margin: 0 0 10px; }
+  h1 { font-size: 22px; margin: 0 0 4px; font-weight: 800; letter-spacing: -.01em; color: var(--navy); }
+  h2 { font-size: 16px; margin: 0 0 10px; font-weight: 700; color: var(--navy); }
   h3 { font-size: 14px; margin: 0 0 8px; }
   .muted { color: var(--text-muted); font-size: 12px; }
 
-  #login-screen, #trainer-pin-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: linear-gradient(160deg, var(--court-dark), var(--court)); }
-  .auth-box { background: #fff; border-radius: 14px; padding: 32px; width: 340px; box-shadow: var(--shadow); }
-  .auth-box h1 { color: var(--court-dark); font-size: 22px; }
+  #login-screen, #trainer-pin-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 16px;
+    background: linear-gradient(180deg, rgba(6,18,43,.55), rgba(6,18,43,.92)), url('assets/presupuestos/cabecera.jpg') center 62% / cover, var(--navy); }
+  .auth-box { background: #fff; border-radius: 16px; padding: 0 0 28px; width: 360px; max-width: 100%; box-shadow: 0 20px 60px rgba(0,0,0,.45); overflow: hidden; }
+  .auth-box > *:not(.auth-brand) { margin-left: 30px; margin-right: 30px; }
+  .auth-brand { background: var(--navy); padding: 26px 30px 22px; margin-bottom: 22px; border-bottom: 4px solid var(--court); }
+  .auth-brand img { width: 150px; display: block; }
+  .auth-brand .kicker { margin-top: 14px; font-weight: 900; font-size: 13px; letter-spacing: .18em; color: var(--neon); text-transform: uppercase; }
+  .auth-box h1 { color: var(--navy); font-size: 22px; }
   .auth-switch { margin-top: 14px; text-align: center; font-size: 13px; }
 
   #app { display: none; min-height: 100vh; }
   #app.active { display: flex; }
-  #sidebar { width: 230px; background: var(--court-dark); color: #fff; flex-shrink: 0; display: flex; flex-direction: column; }
-  #sidebar .brand { padding: 18px 16px; font-weight: 700; font-size: 15px; border-bottom: 1px solid rgba(255,255,255,.15); }
+  #sidebar { width: 236px; background: var(--navy); color: #fff; flex-shrink: 0; display: flex; flex-direction: column; }
+  #sidebar .brand { padding: 22px 18px 18px; border-bottom: 1px solid rgba(255,255,255,.1); }
+  #sidebar .brand img { width: 128px; display: block; }
+  #sidebar .brand .kicker { margin-top: 10px; font-size: 11px; font-weight: 800; letter-spacing: .18em; color: var(--neon); text-transform: uppercase; }
   #sidebar .club-select { padding: 10px 14px; }
-  #sidebar .club-select select { background: rgba(255,255,255,.1); color: #fff; border: 1px solid rgba(255,255,255,.25); }
+  #sidebar .club-select select { background: var(--navy-2); color: #fff; border: 1px solid rgba(255,255,255,.25); }
   #nav-blocks { flex: 1; overflow-y: auto; padding: 6px 0; }
-  .nav-block > .nav-block-title { padding: 10px 16px; font-size: 13px; font-weight: 700; cursor: pointer; opacity: .9; display: flex; justify-content: space-between; }
+  .nav-block > .nav-block-title { padding: 12px 18px 6px; font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; cursor: pointer; color: rgba(255,255,255,.5); display: flex; justify-content: space-between; }
   .nav-block .nav-sub { display: none; }
   .nav-block.open .nav-sub { display: block; }
-  .nav-sub a { display: block; padding: 7px 16px 7px 26px; font-size: 13px; color: rgba(255,255,255,.8); text-decoration: none; }
-  .nav-sub a:hover, .nav-sub a.active { background: rgba(255,255,255,.12); color: #fff; }
-  #sidebar .user-box { padding: 12px 16px; border-top: 1px solid rgba(255,255,255,.15); font-size: 12px; }
+  .nav-sub a { display: block; margin: 2px 10px; padding: 9px 12px; border-radius: 8px; font-size: 14px; font-weight: 500; color: rgba(255,255,255,.78); text-decoration: none; border-left: 3px solid transparent; }
+  .nav-sub a:hover { background: rgba(255,255,255,.07); color: #fff; }
+  .nav-sub a.active { background: rgba(43,103,237,.28); color: #fff; border-left-color: var(--neon); }
+  #sidebar .user-box { padding: 14px 18px; border-top: 1px solid rgba(255,255,255,.1); font-size: 13px; font-weight: 600; }
   #sidebar .user-box button { margin-top: 6px; }
 
-  #content { flex: 1; padding: 22px 26px; overflow-y: auto; max-height: 100vh; }
+  #content { flex: 1; padding: 28px 32px; overflow-y: auto; max-height: 100vh; }
   .content-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px; }
 
   .kpi-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
-  .kpi-card { flex: 1; min-width: 130px; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; box-shadow: var(--shadow); }
-  .kpi-card .num { font-size: 22px; font-weight: 700; color: var(--court-dark); }
+  .kpi-card { flex: 1; min-width: 130px; background: var(--card); border: 1px solid var(--border); border-top: 3px solid var(--court); border-radius: var(--radius); padding: 14px 16px; box-shadow: var(--shadow); }
+  .kpi-card .num { font-size: 24px; font-weight: 800; color: var(--navy); }
   .kpi-card .label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .03em; }
 
   .grid-parrilla { display: grid; grid-template-columns: 70px repeat(7, 1fr); gap: 4px; font-size: 12px; }
@@ -103,7 +125,7 @@
   .modal .close-x { float: right; background: none; border: none; font-size: 18px; color: var(--text-muted); }
 
   #toast-box { position: fixed; bottom: 18px; right: 18px; z-index: 100; display: flex; flex-direction: column; gap: 8px; max-width: 320px; }
-  .toast { background: var(--court-dark); color: #fff; padding: 10px 14px; border-radius: 8px; font-size: 13px; box-shadow: var(--shadow); }
+  .toast { background: var(--navy); color: #fff; padding: 10px 14px; border-radius: 8px; font-size: 13px; box-shadow: var(--shadow); }
   .toast.error { background: var(--danger); }
 
   #notif-panel { position: fixed; bottom: 18px; right: 18px; width: 300px; background: #fff; border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); z-index: 90; }
@@ -113,7 +135,7 @@
   /* Vista entrenador: pensada para móvil, texto grande, poco scroll */
   #trainer-view { display: none; min-height: 100vh; background: var(--bg); }
   #trainer-view.active { display: block; }
-  #trainer-view .tv-header { background: var(--court-dark); color: #fff; padding: 16px 18px; display: flex; justify-content: space-between; align-items: center; }
+  #trainer-view .tv-header { background: var(--navy); color: #fff; padding: 16px 18px; display: flex; justify-content: space-between; align-items: center; }
   #trainer-view .tv-header h1 { color: #fff; font-size: 18px; }
   #trainer-view .tv-content { padding: 16px; max-width: 640px; margin: 0 auto; }
   #trainer-view .class-card { background: #fff; border-radius: var(--radius); padding: 14px; margin-bottom: 12px; box-shadow: var(--shadow); font-size: 15px; }
@@ -148,7 +170,7 @@
   @media (max-width: 780px) {
     #app.active { flex-direction: column; }
     #sidebar { width: 100%; }
-    #content { max-height: none; }
+    #content { max-height: none; padding: 20px 16px; }
   }
 </style>
 </head>
@@ -156,16 +178,17 @@
 
 <div id="login-screen">
   <div class="auth-box">
-    <h1>Bamvolea Sportcity Valencia</h1>
+    <div class="auth-brand"><img src="assets/presupuestos/logo-blanco.png" alt="Bamvolea Sportcity" /><div class="kicker">Eventos de empresa</div></div>
+    <h1>Bienvenido/a</h1>
     <p class="muted">Accede con tu cuenta de equipo.</p>
-    <p class="muted" style="font-size:10px;opacity:.6">build 2026-07-23-d</p>
+    <p class="muted" style="font-size:10px;opacity:.6">build 2026-10-06-eventos</p>
     <div id="login-error" class="warn hidden"></div>
     <form id="login-form">
       <div class="field"><label>Email</label><input type="email" id="login-email" required autocomplete="username" /></div>
       <div class="field"><label>Contraseña</label><input type="password" id="login-pass" required autocomplete="current-password" /></div>
       <button class="btn" type="submit" style="width:100%">Entrar</button>
     </form>
-    <div class="auth-switch"><a href="#" id="go-trainer-pin">Soy entrenador/a &rarr; Vista entrenador (PIN)</a></div>
+    <div class="auth-switch hidden" id="trainer-pin-switch"><a href="#" id="go-trainer-pin">Soy entrenador/a &rarr; Vista entrenador (PIN)</a></div>
   </div>
 </div>
 
@@ -184,7 +207,7 @@
 
 <div id="app">
   <div id="sidebar">
-    <div class="brand">🎾 Bamvolea Sportcity<br/>Valencia</div>
+    <div class="brand"><img src="assets/presupuestos/logo-blanco.png" alt="Bamvolea Sportcity" /><div class="kicker">Eventos</div></div>
     <div class="club-select">
       <label style="color:rgba(255,255,255,.7)">Club</label>
       <select id="club-selector"></select>
@@ -226,7 +249,7 @@ const CLUB_BRAND = 'Bamvolea Sportcity Valencia';
 // opción al crear un evento. Déjalo vacío para desactivar el aviso.
 const EVENTOS_PROVEEDOR_EMAIL = window.EVENTOS_PROVEEDOR_EMAIL || '';
 const CATEGORIA_COLORS = {
-  'Torneo externo': '#7a4fb5', 'Alquiler empresa': '#2f6f4f', 'Actividad puntual': '#d98c3a', 'Otro': '#66756f',
+  'Torneo externo': '#6a4fd8', 'Alquiler empresa': '#2b67ed', 'Actividad puntual': '#e08a1e', 'Otro': '#5d6882',
 };
 // Playtomic devuelve en el mismo feed partidos entre socios (OPEN_MATCH,
 // REGULAR_BOOKING), clases y cursos de academia (COURSE_CLASS), clases
@@ -395,8 +418,26 @@ const NAV = [
   ]},
 ];
 
+// Herramienta solo de eventos: el resto de módulos del CRM (Academia,
+// Entrenadores, Playtomic, Vista entrenador por PIN...) sigue en el código
+// pero queda oculto e inaccesible. Poner a false para recuperar el CRM completo.
+const EVENTS_ONLY = true;
+const EVENTS_NAV = [
+  { key: 'eventos', title: 'Eventos', roles: ['admin','coordinacion','direccion','front_desk'], items: [
+    { key: 'presupuestos', label: 'Presupuestos' },
+    { key: 'eventos', label: 'Calendario de eventos' },
+  ]},
+  { key: 'config', title: 'Configuración', roles: ['admin','direccion','administracion'], items: [
+    { key: 'plantillas', label: 'Plantillas de email' },
+  ]},
+];
+
 function navVisibleFor(role) {
-  return NAV.filter((b) => b.roles === 'all' || b.roles.includes(role));
+  return (EVENTS_ONLY ? EVENTS_NAV : NAV).filter((b) => b.roles === 'all' || b.roles.includes(role));
+}
+
+function allowedKeys() {
+  return navVisibleFor(state.profile?.role).flatMap((b) => b.items.map((it) => it.key));
 }
 
 function renderNav() {
@@ -404,11 +445,11 @@ function renderNav() {
   box.innerHTML = '';
   const blocks = navVisibleFor(state.profile.role);
   blocks.forEach((block, i) => {
-    const b = el(`<div class="nav-block ${i === 0 ? 'open' : ''}">
-      <div class="nav-block-title">${esc(block.title)} <span>${i === 0 ? '&minus;' : '+'}</span></div>
+    const b = el(`<div class="nav-block ${(EVENTS_ONLY || i === 0) ? 'open' : ''}">
+      <div class="nav-block-title">${esc(block.title)} <span>${EVENTS_ONLY ? '' : i === 0 ? '&minus;' : '+'}</span></div>
       <div class="nav-sub">${block.items.map((it) => `<a href="#${it.key}" data-key="${it.key}">${esc(it.label)}</a>`).join('')}</div>
     </div>`);
-    qs('.nav-block-title', b).onclick = () => {
+    if (!EVENTS_ONLY) qs('.nav-block-title', b).onclick = () => {
       const wasOpen = b.classList.contains('open');
       qsa('.nav-block', box).forEach((x) => x.classList.remove('open'));
       qsa('.nav-block-title span', box).forEach((s) => (s.textContent = '+'));
@@ -419,9 +460,17 @@ function renderNav() {
 }
 
 async function router() {
-  const key = (location.hash || '#guia').slice(1);
-  qsa('#nav-blocks a').forEach((a) => a.classList.toggle('active', a.dataset.key === key));
   const content = qs('#content');
+  let key = (location.hash || (EVENTS_ONLY ? '' : '#guia')).slice(1);
+  if (EVENTS_ONLY) {
+    const allowed = allowedKeys();
+    if (!allowed.length) {
+      content.innerHTML = '<div class="warn">Tu usuario no tiene acceso a la herramienta de eventos. Pide a un admin que revise tu rol en "profiles".</div>';
+      return;
+    }
+    if (!allowed.includes(key)) key = allowed[0];
+  }
+  qsa('#nav-blocks a').forEach((a) => a.classList.toggle('active', a.dataset.key === key));
   content.innerHTML = '<p class="muted">Cargando…</p>';
   const mod = MODULES[key] || MODULES.guia;
   try {
@@ -492,6 +541,7 @@ async function bootstrapApp() {
   state.selectedClubId = localStorage.getItem('selectedClubId') && accessibleClubs.some(c => c.id === localStorage.getItem('selectedClubId'))
     ? localStorage.getItem('selectedClubId') : accessibleClubs[0]?.id;
   clubSelect.value = state.selectedClubId;
+  qs('#sidebar .club-select').classList.toggle('hidden', accessibleClubs.length <= 1);
   clubSelect.onchange = () => { state.selectedClubId = clubSelect.value; localStorage.setItem('selectedClubId', state.selectedClubId); router(); };
 
   const [{ data: trainers }, { data: classTypes }, { data: templates }] = await Promise.all([
@@ -521,12 +571,14 @@ supabase.auth.onAuthStateChange((event) => {
   if (event === 'SIGNED_OUT') location.reload();
 });
 
+if (!EVENTS_ONLY) qs('#trainer-pin-switch').classList.remove('hidden');
+
 (async function init() {
   const savedTrainer = localStorage.getItem('trainerSession');
   const { data: { session } } = await supabase.auth.getSession();
   if (session) {
     await bootstrapApp();
-  } else if (savedTrainer) {
+  } else if (savedTrainer && !EVENTS_ONLY) {
     state.trainerSession = JSON.parse(savedTrainer);
     await bootstrapTrainerView();
   }
@@ -1951,10 +2003,10 @@ MODULES.eventos = async (content) => {
 const QUOTE_ASSETS = 'assets/presupuestos/';
 const QUOTE_CLUB_ADDRESS = 'C/ Del Polideportivo, 2,<br/>46470 Massanassa, Valencia';
 const QUOTE_STATUS = {
-  borrador: { label: 'Borrador', color: '#66756f' },
+  borrador: { label: 'Borrador', color: '#5d6882' },
   enviado: { label: 'Enviado', color: '#2b67ed' },
-  aceptado: { label: 'Aceptado', color: '#2f6f4f' },
-  rechazado: { label: 'Rechazado', color: '#b3413a' },
+  aceptado: { label: 'Aceptado', color: '#12924a' },
+  rechazado: { label: 'Rechazado', color: '#d23b3b' },
 };
 const QUOTE_CATEGORY_LABEL = {
   pistas: 'Pistas', material: 'Material', personal: 'Personal y gestión', actividades: 'Actividades',

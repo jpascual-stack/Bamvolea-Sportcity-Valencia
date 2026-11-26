@@ -2175,7 +2175,7 @@ const QUOTE_SHEET_CSS = `
   .qs-sub { margin-top: 4.5mm; font-weight: 700; font-size: 11.5pt; color: #fff; letter-spacing: .04em; text-transform: uppercase; }
   .qs-logo { position: absolute; right: 16mm; top: 14mm; height: 20mm; }
 
-  .qs-facts { position: relative; z-index: 2; margin: -9mm 16mm 0; display: flex; background: #fff; border-radius: 3mm; box-shadow: 0 2mm 7mm rgba(11,22,34,.16); border: 1px solid var(--qs-line); overflow: hidden; }
+  .qs-facts { position: relative; z-index: 2; margin: -9mm 16mm 0; display: flex; background: #fff; border-radius: 3mm; border: 1px solid #D5DDE9; overflow: hidden; }
   .qs-fact { flex: 1 1 0; padding: 4.4mm 4mm; display: flex; gap: 3mm; align-items: center; border-right: 1px solid var(--qs-line); }
   .qs-fact:first-child { flex-grow: 1.25; }
   .qs-fact:last-child { border-right: 0; }
@@ -2263,7 +2263,11 @@ const QS_ICONS = {
   music: '<path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/>',
   check: '<circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.7 2.7L16 10"/>',
 };
-function qsIcon(name) { return `<div class="qs-ico"><svg viewBox="0 0 24 24">${QS_ICONS[name] || QS_ICONS.check}</svg></div>`; }
+// Atributos dentro del propio <svg> (xmlns, tamaño y color): html2canvas
+// convierte cada SVG en imagen por separado y no ve el CSS de la página.
+function qsIcon(name, color = '#3BF53B') {
+  return `<div class="qs-ico"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${QS_ICONS[name] || QS_ICONS.check}</svg></div>`;
+}
 function qsServiceIcon(text) {
   const t = String(text).toLowerCase();
   const rules = [
@@ -2314,7 +2318,7 @@ function quoteSheetHtml(q, base = QUOTE_ASSETS) {
       if (col === 0 && (next === undefined || next.length > 70)) wide = true;
     }
     col = wide ? 0 : (col + 1) % 2;
-    return `<div class="qs-svc${wide ? ' wide' : ''}">${qsIcon(qsServiceIcon(s))}<span>${esc(s)}</span></div>`;
+    return `<div class="qs-svc${wide ? ' wide' : ''}">${qsIcon(qsServiceIcon(s), '#064CEA')}<span>${esc(s)}</span></div>`;
   }).join('');
   const amount = fmtEur(t.total).replace('€', ' €');
   const vat = q.vat_mode || 'exento';
@@ -2338,7 +2342,7 @@ function quoteSheetHtml(q, base = QUOTE_ASSETS) {
         ${q.client_logo ? `<img class="qs-client" src="${esc(q.client_logo)}" alt="" />` : ''}
       </div>
       <div class="qs-grid">${cards}</div>
-      ${prizes.length ? `<div class="qs-prize">${qsIcon('trophy')}<div><b>Premios</b><div>${prizes.map(esc).join('<br/>')}</div></div></div>` : ''}
+      ${prizes.length ? `<div class="qs-prize">${qsIcon('trophy', '#3BF53B')}<div><b>Premios</b><div>${prizes.map(esc).join('<br/>')}</div></div></div>` : ''}
     </div>
     <div class="qs-total">
       <div><small>Importe total</small><h4>Total evento deportivo</h4><p>Incluye todos los servicios detallados arriba</p></div>
